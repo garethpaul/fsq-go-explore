@@ -3,10 +3,12 @@ package app
 
 import (
 	"net/http"
+	"limiter"
+	"time"
 )
 
 func init() {
-	http.HandleFunc("/", HeaderCache(SearchPage))
+	http.Handle("/", limiter.LimitFuncHandler(limiter.NewLimiter(10, time.Minute), HeaderCache(SearchPage)))
 	http.HandleFunc("/login", Login)
 	http.HandleFunc("/redirect", Redirect)
 	http.HandleFunc("/edit", LoginProtect(EditPage))
