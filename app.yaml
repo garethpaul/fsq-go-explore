@@ -1,0 +1,12 @@
+runtime: go
+api_version: go1
+application: fsq-go-explore
+
+env_variables:
+  FSQ_CLIENT_ID: 'INSERT_CLIENT_ID'
+  FSQ_CLIENT_SECRET: 'INSERT_CLIENT_SECRET'
+  FSQ_VERSION: 'YYYYMMDD'
+
+handlers:
+- url: /.*
+  script: _go_main
