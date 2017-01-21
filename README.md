@@ -2,6 +2,8 @@ Foursquare-Go-Explore
 ===================
 An example of how to access Foursquare Data using GoLang and AppEngine. You can find this running in the wild via [fsq-go-explore.appspot.com](http://fsq-go-explore.appspot.com/).
 
+![Screenshot](https://raw.githubusercontent.com/garethpaul/fsq-go-explore/master/static/images/screen.png)
+
 Getting Started
 ----------
 Here are some steps to get you started.
