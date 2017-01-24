@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="robots" content="noindex">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Data Explorer</title>
+    <link href="//maxcdn.bootstrapcdn.com/bootstrap/3.3.0/css/bootstrap.min.css" rel="stylesheet" id="bootstrap-css">
+    <link href="https://fonts.googleapis.com/css?family=Inconsolata" rel="stylesheet">
+    <link href="/static/css/screen.css" rel="stylesheet">
+</head>
+<body>
+{{template "header" .}}
+<article style="margin-top:50px;">
+<div class="container">
+  <div class="row content">
+    <div class="col-sm-8 offset2">
+    <h1>{{ .Venue.Name }}</h1>
+
+    <form action="propose_edit" method="post">
+      <input type="hidden" name="id" value="{{ .Venue.ID }}">
+    <div class="form-group row">
+      <label for="example-text-input" class="col-2 col-form-label">Name</label>
+      <div class="col-10">
+        <input class="form-control" type="text" value="{{ .Venue.Name }}" name="name" id="name">
+      </div>
+    </div>
+    <div class="form-group row">
+      <label for="example-text-input" class="col-2 col-form-label">Address</label>
+      <div class="col-10">
+        <input class="form-control" type="text" value="{{ .Venue.Location.Address }}" name="address" id="address">
+      </div>
+    </div>
+    <div class="form-group row">
+      <label for="example-text-input" class="col-2 col-form-label">Cross Street</label>
+      <div class="col-10">
+        <input class="form-control" type="text" value="{{ .Venue.Location.CrossStreet }}" name="crossStreet" id="crossStreet">
+      </div>
+    </div>
+    <div class="form-group row">
+      <label for="example-text-input" class="col-2 col-form-label">City</label>
+      <div class="col-10">
+        <input class="form-control" type="text" value="{{ .Venue.Location.City }}" name="city" id="city">
+      </div>
+    </div>
+    <div class="form-group row">
+      <label for="example-text-input" class="col-2 col-form-label">State</label>
+      <div class="col-10">
+        <input class="form-control" type="text" value="{{ .Venue.Location.State }}" name="state" id="state">
+      </div>
+    </div>
+
+    <div class="form-group row">
+      <label for="example-text-input" class="col-2 col-form-label">ZIP</label>
+      <div class="col-10">
+        <input class="form-control" type="text" value="{{ .Venue.Location.PostalCode }}" name="state" id="state">
+      </div>
+    </div>
+
+    <div class="form-group row">
+      <label for="example-text-input" class="col-2 col-form-label">Phone</label>
+      <div class="col-10">
+        <input class="form-control" type="text" value="{{ .Venue.Contact.Phone }}" name="contact" id="contact">
+      </div>
+    </div>
+
+    <div class="form-group row">
+      <label for="example-text-input" class="col-2 col-form-label">Twitter</label>
+      <div class="col-10">
+        <input class="form-control" type="text" value="{{ .Venue.Contact.Twitter }}" name="twitter" id="twitter">
+      </div>
+    </div>
+
+    <div class="form-group row">
+      <label for="exampleTextarea">Description</label>
+      <textarea class="form-control" id="description" name="description" rows="3">{{ .Venue.Description}}</textarea>
+    </div>
+
+    <div class="form-group row">
+      <label for="example-text-input" class="col-2 col-form-label">URL</label>
+      <div class="col-10">
+        <input class="form-control" type="text" value="{{ .Venue.URL }}" name="url" id="url">
+      </div>
+    </div>
+
+    <div class="form-group row">
+      <label for="example-text-input" class="col-2 col-form-label">Menu URL</label>
+      <div class="col-10">
+        <input class="form-control" type="text" value="{{ .Venue.Menu.URL }}" name="menuUrl" id="menuUrl">
+      </div>
+    </div>
+
+    <div class="form-group row">
+      <label for="example-text-input" class="col-2 col-form-label">Facebook URL</label>
+      <div class="col-10">
+        <input class="form-control" type="text" value="{{ .Venue.Contact.Facebook }}" name="facebookUrl" id="facebookUrl">
+      </div>
+    </div>
+
+    <div class="form-group row">
+      <label for="example-text-input" class="col-2 col-form-label">Venue Lat Long</label>
+      <div class="col-10">
+        <input class="form-control" type="text" value="{{ .Venue.Location.Lat }},{{ .Venue.Location.Lng }}" name="venuell" id="venuell">
+      </div>
+    </div>
+
+    <div class="form-group row">
+      <input type="submit" class="btn btn-primary" value="Propose Edit" />
+    </div>
+
+    </form>
+  </div>
+  </div>
+</div>
+
+</article>
+
+<script src="//code.jquery.com/jquery-1.10.2.min.js"></script>
+<script src="//maxcdn.bootstrapcdn.com/bootstrap/3.3.0/js/bootstrap.min.js"></script>
+<script type="text/javascript">
+$( document ).ready(function() {
+  //$('#myModal').modal('toggle');
+});
+</script>
+<script async defer src="//buttons.github.io/buttons.js"></script>
+
+</body>
+</html>
