@@ -14,6 +14,18 @@ type VenueSearchResponse struct {
 	Venues []Venue `json:"venues"`
 }
 
+// UserResponse a foursquare UserResponse.
+// https://developer.foursquare.com/docs/venues/search
+type UserResponse struct {
+	User User `json:"user"`
+}
+
+// UserResponse a foursquare VenueResponse.
+// https://developer.foursquare.com/docs/venues
+type VenueResponse struct {
+	Venue Venue `json:"venue"`
+}
+
 // Venue represents a foursquare Venue.
 // https://developer.foursquare.com/docs/responses/venue
 type Venue struct {
