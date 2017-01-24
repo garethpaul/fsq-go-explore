@@ -6,7 +6,6 @@ import (
   "log"
   "os"
   "appengine"
-  "appengine/urlfetch"
   "appengine/memcache"
   "encoding/json"
   "html/template"
@@ -79,6 +78,7 @@ func SearchPage(w http.ResponseWriter, r *http.Request) {
       SearchPageResponse: resp,
     }
   	t.Execute(w, payload)
+
   } else if err != nil {
 
   	// Issue getting item from cache
@@ -96,7 +96,3 @@ func SearchPage(w http.ResponseWriter, r *http.Request) {
   }
 }
 // [END Search_Page]
-
-func getHttpClient(r *http.Request) http.Client {
-	return http.Client{Transport: &urlfetch.Transport{Context: appengine.NewContext(r)}}
-}
