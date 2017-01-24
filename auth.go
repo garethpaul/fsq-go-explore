@@ -135,6 +135,27 @@ func Redirect(w http.ResponseWriter, r *http.Request) {
                         Expires:expiration}
   http.SetCookie(w, &cookie)
   log.Print(accessToken)
+  http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
+}
+
+// Process a request and cache using headers.
+func LoginProtect(fn http.HandlerFunc) http.HandlerFunc {
+  return func(w http.ResponseWriter, r *http.Request) {
+
+    cookie, _ := r.Cookie("fsq")
+    if cookie == nil {
+      http.Redirect(w, r, "/login", http.StatusTemporaryRedirect)
+    } else {
+      fn(w,r)
+    }
+  }
+}
+
+// Process a request and cache using headers.
+func Logout(w http.ResponseWriter, r *http.Request) {
+  cookie := http.Cookie{Name: "fsq", Path: "/", MaxAge: -1}
+  http.SetCookie(w, &cookie)
+  http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
 }
 
 
