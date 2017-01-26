@@ -239,3 +239,7 @@ h5#exampleModalLabel {
 .modal-header .closer {
     margin-top: -3px;
 }
+.blur {
+  -webkit-filter: blur(10px);
+  filter: blur(10px);
+}
