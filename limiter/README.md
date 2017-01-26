@@ -44,7 +44,7 @@ func main() {
 
     // Limit based on basic auth usernames.
     // Typically, you prefetched these values from the database.
-    l.BasicAuthUsers = []string{"bob", "joe", "didip"}
+    l.BasicAuthUsers = []string{"gareth", "matthew", "ryan"}
     ```
 
 2. Each request handler can be rate-limited individually.
