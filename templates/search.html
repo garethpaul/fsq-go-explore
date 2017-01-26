@@ -117,8 +117,8 @@
           <td>{{.Location.State}}</td>
           <td>{{.Location.PostalCode}}</td>
           <td>{{.Location.Cc}}</td>
-          <td class="blur">{{if .Location.Lat}}.Location.Lat{{else}} Unknown {{end}}</td>
-          <td class="blur">{{if .Location.Lng}}.Location.Lng{{else}} Unknown {{end}}</td>
+          <td class="blur">{{if .Location.Lat}}{{.Location.Lat}}{{else}} Unknown {{end}}</td>
+          <td class="blur">{{if .Location.Lng}}{{.Location.Lng}}{{else}} Unknown {{end}}</td>
           <td>{{.Contact.FormattedPhone}}</td>
           <td>{{.URL}}</td>
           <td>{{range .Categories}}{{.Name}}{{end}}</td>
