@@ -14,6 +14,9 @@ func EditPage(w http.ResponseWriter, r *http.Request) {
 
   cookie, _ := r.Cookie("fsq")
   accessToken := getAccessToken(r, cookie.Value)
+  if accessToken == "" {
+    http.Redirect(w, r, "/logout", http.StatusTemporaryRedirect)
+  }
 
   t := template.Must(template.ParseFiles("templates/edit.html", "templates/navigation.html"))
 
@@ -25,6 +28,7 @@ func EditPage(w http.ResponseWriter, r *http.Request) {
     Version: 			os.Getenv("FSQ_VERSION"),
     AccessToken: accessToken,
   }
+
 
   id := r.FormValue("id")
   service := fsq.NewFoursquareService(c)

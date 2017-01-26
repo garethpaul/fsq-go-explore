@@ -20,7 +20,7 @@ import (
 
 var (
   foursquareOauthConfig = &oauth2.Config{
-    RedirectURL:	"http://localhost:8080/redirect",
+    RedirectURL:	"https://fsq-go-explore.appspot.com/redirect",
     ClientID:     os.Getenv("FSQ_CLIENT_ID"),
     ClientSecret: os.Getenv("FSQ_CLIENT_SECRET"),
     Endpoint:     foursquare.Endpoint,
