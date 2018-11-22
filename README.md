@@ -130,4 +130,4 @@ Here we use a very basic caching strategy that utilizes a `key` and looks up tha
 > - Objects can be stored in their original form using AppEngine.
 > - We set **two hours** as the maximum time the object is stored in cache.
 
-More technical specifics can be found on this within [pages.go](https://github.com/garethpaul/fsq-go-explore/blob/master/pags.go). 
+More technical specifics can be found on this within [pages.go](https://github.com/garethpaul/fsq-go-explore/blob/master/pages.go). 
