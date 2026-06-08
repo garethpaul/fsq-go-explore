@@ -17,7 +17,7 @@ This README is based on the checked-in source, manifests, scripts, and repositor
 - `go.mod` and `go.sum` - Go module dependency metadata
 - `fsq` - source or example code
 - `limiter` - source or example code
-- `scripts/check-baseline.sh` - Go formatting, test, import, and credential-log checks
+- `scripts/check-baseline.sh` - Go formatting, test, import, and credential/privacy-log checks
 - `SECURITY.md` - security reporting and disclosure guidance
 - `static` - source or example code
 - `templates` - source or example code
@@ -64,7 +64,7 @@ make check
 
 The baseline runs `go test ./...`, verifies Go formatting, checks that module
 imports are used instead of GOPATH-era local imports, and guards against
-credential-adjacent logging.
+credential- and location-adjacent logging.
 
 When the required SDK or runtime is unavailable, use static checks and source review first, then verify on a machine that has the matching platform toolchain.
 
@@ -83,6 +83,8 @@ When the required SDK or runtime is unavailable, use static checks and source re
 - Review changes touching file, media, JSON, XML, CSV, OCR, or data parsing; examples from the scan include auth.go, fsq/api.go, fsq/common.go, fsq/keys.go, and 3 more.
 - Cache keys are deterministic SHA-256 digests and should not expose raw query,
   token, or user fields.
+- OAuth login uses per-request state values and HTTP-only cookies for callback
+  validation.
 
 ## Maintenance Notes
 

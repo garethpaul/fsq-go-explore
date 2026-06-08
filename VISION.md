@@ -28,12 +28,12 @@ Current baseline:
 - The Go module is defined by `go.mod` and `go.sum` with App Engine/OAuth/rate-limit
   dependencies.
 - `scripts/check-baseline.sh` and `make check` run `go test ./...`, Go
-  formatting checks, module-import checks, and credential-log guardrails.
+  formatting checks, module-import checks, and credential/privacy-log guardrails.
 - Internal imports use `github.com/garethpaul/fsq-go-explore/...` module paths.
 - The cache-key generation path uses stable SHA-256 digests rather than reversible
   encrypted payloads.
 - Foursquare request logging avoids raw URLs, tokens, edit payloads, and user
-  records.
+  records, and search handling avoids raw location logging.
 - OAuth redirects use per-login state cookies rather than a shared static state
   string.
 

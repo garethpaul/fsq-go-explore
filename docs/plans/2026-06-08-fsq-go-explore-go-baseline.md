@@ -11,21 +11,21 @@ status: completed
 - Add a reproducible Go module baseline without changing the sample's runtime behavior.
 - Update local imports and App Engine imports so `go test ./...` can compile the repository.
 - Add focused tests around cache-key generation and search request parsing.
-- Replace credential-adjacent logging with safer diagnostics.
+- Replace credential- and location-adjacent logging with safer diagnostics.
 - Document the supported verification command and dependency expectations.
 
 ## Work Items
 
 1. Added `go.mod` and `go.sum` for the existing packages.
 2. Updated internal imports to use the module path and modern App Engine package paths.
-3. Added `make check` with Go formatting, tests, and static credential checks.
+3. Added `make check` with Go formatting, tests, and static credential/privacy checks.
 4. Added focused tests for deterministic cache keys, OAuth state generation, venue path escaping, and App Engine header fallback parsing.
 5. Updated README, VISION, SECURITY, and CHANGES with the new baseline.
 6. Replaced reversible cache-key encryption with stable SHA-256 digest keys.
 7. Replaced static OAuth state with a per-login state cookie.
 8. Escaped venue IDs before building Foursquare detail and edit request paths.
 9. Returned explicit HTTP errors for search cache failure paths.
-10. Removed raw token, URL, edit payload, and user record logging.
+10. Removed raw token, URL, edit payload, user record, and search location logging.
 
 ## Verification
 
