@@ -1,5 +1,8 @@
 ## Foursquare Go Explore Vision
 
+This document explains the current state and direction of the project.
+Project overview and developer docs: [`README.md`](README.md)
+
 Foursquare Go Explore is a Go/App Engine sample for calling Foursquare venue
 search APIs with header and memcache-based caching.
 
