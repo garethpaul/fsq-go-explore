@@ -42,7 +42,7 @@ keys should not expose raw secrets or unnecessary user data.
 Rate limiting and caching should fail predictably under abuse or upstream
 errors.
 
-## What We Will Not Merge For Now
+## What We Will Not Merge (For Now)
 
 - Hardcoded client IDs or secrets
 - Cache changes that violate platform policy or leak sensitive data
