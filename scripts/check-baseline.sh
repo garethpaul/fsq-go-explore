@@ -31,6 +31,7 @@ for path in \
   "search.go" \
   "search_test.go" \
   "fsq/api.go" \
+  "fsq/api_test.go" \
   "fsq/keys.go" \
   "fsq/keys_test.go" \
   "limiter/limiter.go" \
@@ -56,14 +57,15 @@ if git -C "$ROOT_DIR" grep -nE '^[[:space:]]*"(fsq|limiter|limiter/config|limite
   exit 1
 fi
 
-if git -C "$ROOT_DIR" grep -nE 'log\.Print\(accessToken|log\.Print\(user\)|fmt\.Print|key_text|NewCFBEncrypter|panic\(|stateString|STATE_STR|request failed: %v' -- '*.go'; then
-  printf '%s\n' "Go source must avoid raw credential logging, reversible cache keys, and panic-based request paths." >&2
+if git -C "$ROOT_DIR" grep -nE 'log\.Print\(accessToken|log\.Print\(user\)|near=%q|fmt\.Print|key_text|NewCFBEncrypter|panic\(|template\.Must|stateString|STATE_STR|request failed: %v' -- '*.go'; then
+  printf '%s\n' "Go source must avoid raw credential/location logging, reversible cache keys, and panic-based request paths." >&2
   exit 1
 fi
 
 if ! grep -Fq "newOAuthState" "$ROOT_DIR/auth.go" ||
-  ! grep -Fq "oauthStateCookieName" "$ROOT_DIR/auth.go"; then
-  printf '%s\n' "OAuth redirects must use per-login state cookies." >&2
+  ! grep -Fq "oauthStateCookieName" "$ROOT_DIR/auth.go" ||
+  ! grep -Fq "TestNewOAuthStateReturnsDistinctOpaqueValues" "$ROOT_DIR/auth_test.go"; then
+  printf '%s\n' "OAuth redirects must use tested per-login state cookies." >&2
   exit 1
 fi
 

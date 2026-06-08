@@ -19,11 +19,13 @@ status: completed
 1. Added `go.mod` and `go.sum` for the existing packages.
 2. Updated internal imports to use the module path and modern App Engine package paths.
 3. Added `make check` with Go formatting, tests, and static credential checks.
-4. Added focused tests for deterministic cache keys, OAuth state generation, and App Engine header fallback parsing.
+4. Added focused tests for deterministic cache keys, OAuth state generation, venue path escaping, and App Engine header fallback parsing.
 5. Updated README, VISION, SECURITY, and CHANGES with the new baseline.
 6. Replaced reversible cache-key encryption with stable SHA-256 digest keys.
 7. Replaced static OAuth state with a per-login state cookie.
-8. Removed raw token, URL, edit payload, and user record logging.
+8. Escaped venue IDs before building Foursquare detail and edit request paths.
+9. Returned explicit HTTP errors for search cache failure paths.
+10. Removed raw token, URL, edit payload, and user record logging.
 
 ## Verification
 

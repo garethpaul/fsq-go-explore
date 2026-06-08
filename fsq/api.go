@@ -104,7 +104,7 @@ func (fsqs *FoursquareService) VenueEdit(venueId string, vals url.Values) {
 	client := foursquareConfig.Client
 	req, err := http.NewRequest(http.MethodPost, requestURL, bytes.NewBufferString(vals.Encode()))
 	if err != nil {
-		log.Printf("foursquare venue edit request build failed: %v", err)
+		log.Print("foursquare venue edit request build failed")
 		return
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")

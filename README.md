@@ -28,7 +28,7 @@ Additional scan context:
 - Source directories: fsq, limiter, static, templates
 - Dependency and build manifests: go.mod, go.sum
 - Entry points or build surfaces: main.go, app.yaml
-- Test-looking files: search_test.go, fsq/keys_test.go
+- Test-looking files: auth_test.go, search_test.go, fsq/api_test.go, fsq/keys_test.go
 
 ## Getting Started
 

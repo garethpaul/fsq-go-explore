@@ -73,12 +73,14 @@ func SearchPage(w http.ResponseWriter, r *http.Request) {
 
 		// Issue getting item from cache
 		log.Printf("error getting cached search response: %v", err)
+		http.Error(w, "search unavailable", http.StatusInternalServerError)
 	} else {
 
 		// Parse from the cache store.
 		venues := new(fsq.VenueSearchResponse)
 		if err := json.Unmarshal(item.Value, venues); err != nil {
 			log.Printf("search response cache decode failed: %v", err)
+			http.Error(w, "search unavailable", http.StatusInternalServerError)
 			return
 		}
 		payload := SearchPageData{

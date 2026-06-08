@@ -6,7 +6,7 @@ import (
 )
 
 func TestSearchParamParserUsesExplicitNear(t *testing.T) {
-	req := httptest.NewRequest("GET", "/?query=coffee&near=Seattle%2C+WA", nil)
+	req := httptest.NewRequest("GET", "/?query=+coffee+&near=+Seattle%2C+WA+", nil)
 
 	got := SearchParamParser(req)
 
