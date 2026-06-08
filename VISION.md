@@ -36,6 +36,11 @@ Contribution rules:
 
 ## Security
 
+Canonical security policy and reporting:
+
+- [`SECURITY.md`](SECURITY.md)
+
+
 Foursquare credentials are private and must stay out of source control. Cache
 keys should not expose raw secrets or unnecessary user data.
 
