@@ -48,3 +48,6 @@ errors.
 - Cache changes that violate platform policy or leak sensitive data
 - Broad runtime migrations bundled with API behavior changes
 - Limiter changes without examples or tests
+
+This list is a roadmap guardrail, not a permanent rule.
+Strong user demand and strong technical rationale can change it.
