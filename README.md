@@ -75,4 +75,4 @@ Keep changes small and tied to the project that is already present in this repos
 
 Prior README summary:
 
-> fsq-go-explore <!-- README-OVERVIEW-IMAGE --> Foursquare-Go-Explore =================== Getting Started ---------- Here are some steps to get you started. 1. Get your developer keys
+> fsq-go-explore Foursquare-Go-Explore =================== Getting Started ---------- Here are some steps to get you started. 1. Get your developer keys
