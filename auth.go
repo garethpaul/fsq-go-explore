@@ -2,162 +2,218 @@
 package app
 
 import (
-	"fsq"
+	"crypto/rand"
+	"encoding/base64"
+	"encoding/json"
+	"io"
+	"log"
 	"net/http"
-  "os"
-  "log"
-  "fmt"
-  "golang.org/x/oauth2"
-  "golang.org/x/oauth2/foursquare"
-  "golang.org/x/net/context"
-  "google.golang.org/appengine"
-  "google.golang.org/appengine/urlfetch"
-  "google.golang.org/appengine/memcache"
-  "encoding/json"
-	"io/ioutil"
-  "time"
+	"net/url"
+	"os"
+	"time"
+
+	"github.com/garethpaul/fsq-go-explore/fsq"
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/foursquare"
+	"google.golang.org/appengine"
+	"google.golang.org/appengine/memcache"
+	"google.golang.org/appengine/urlfetch"
 )
 
 var (
-  foursquareOauthConfig = &oauth2.Config{
-    RedirectURL:	"https://fsq-go-explore.appspot.com/redirect",
-    ClientID:     os.Getenv("FSQ_CLIENT_ID"),
-    ClientSecret: os.Getenv("FSQ_CLIENT_SECRET"),
-    Endpoint:     foursquare.Endpoint,
-  }
-  // Setup Foursquare Client Config
-  config = &fsq.FoursquareConfig{
-    ClientId: 		os.Getenv("FSQ_CLIENT_ID"),
-    ClientSecret: os.Getenv("FSQ_CLIENT_SECRET"),
-    Version: 			os.Getenv("FSQ_VERSION"),
-    AuthConfig:  foursquareOauthConfig,
-  }
-  STATE_STR = "12312DWD213DW23D2SD"
+	foursquareOauthConfig = &oauth2.Config{
+		RedirectURL:  "https://fsq-go-explore.appspot.com/redirect",
+		ClientID:     os.Getenv("FSQ_CLIENT_ID"),
+		ClientSecret: os.Getenv("FSQ_CLIENT_SECRET"),
+		Endpoint:     foursquare.Endpoint,
+	}
+	// Setup Foursquare Client Config
+	config = &fsq.FoursquareConfig{
+		ClientId:     os.Getenv("FSQ_CLIENT_ID"),
+		ClientSecret: os.Getenv("FSQ_CLIENT_SECRET"),
+		Version:      os.Getenv("FSQ_VERSION"),
+		AuthConfig:   foursquareOauthConfig,
+	}
+	oauthStateCookieName = "fsq_oauth_state"
 )
 
+func newOAuthState() (string, error) {
+	bytes := make([]byte, 32)
+	if _, err := rand.Read(bytes); err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(bytes), nil
+}
 
-func getAccessToken(r *http.Request, key string) (accessToken string) {
-  var ctx context.Context = appengine.NewContext(r)
-  //
-  // Check for Key
-  if item, err := memcache.Get(ctx, key); err == memcache.ErrCacheMiss {
+func secureCookie(r *http.Request) bool {
+	return r.TLS != nil || r.Header.Get("X-AppEngine-Https") == "on" || r.Header.Get("X-Forwarded-Proto") == "https"
+}
 
-    // Getting data
-    log.Print(ctx, "None found")
-    return ""
+func getAccessToken(r *http.Request, key string) string {
+	if key == "" {
+		return ""
+	}
+	ctx := appengine.NewContext(r)
+	item, err := memcache.Get(ctx, key)
+	switch {
+	case err == memcache.ErrCacheMiss:
+		return ""
+	case err != nil:
+		log.Print("error getting access token cache item")
+		return ""
+	}
 
-  } else if err != nil {
-
-    // Issue getting item from cache
-    log.Print(ctx, "error getting item: %v", err)
-  } else {
-
-    // Parse from the cache store.
-    user := new(fsq.FoursquareUser)
-    json.Unmarshal(item.Value, user)
-    return user.AccessToken
-  }
-  return ""
+	user := new(fsq.FoursquareUser)
+	if err := json.Unmarshal(item.Value, user); err != nil {
+		log.Print("error decoding access token cache item")
+		return ""
+	}
+	return user.AccessToken
 }
 
 func setAccessToken(r *http.Request, fsqUser *fsq.FoursquareUser) {
-  key := fsq.GetUserKey(fsqUser)
-  var ctx context.Context = appengine.NewContext(r)
-  item := &memcache.Item{
-    Key:   key,
-    Object: fsqUser,
-  }
-  memcache.JSON.Set(ctx, item)
+	if fsqUser == nil {
+		return
+	}
+	key := fsq.GetUserKey(fsqUser)
+	ctx := appengine.NewContext(r)
+	item := &memcache.Item{
+		Key:    key,
+		Object: fsqUser,
+	}
+	if err := memcache.JSON.Set(ctx, item); err != nil {
+		log.Print("error setting access token cache item")
+	}
 }
 
 // [START Search_Page]
 func Login(w http.ResponseWriter, r *http.Request) {
-  url := config.AuthConfig.AuthCodeURL(STATE_STR)
-  http.Redirect(w, r, url, http.StatusTemporaryRedirect)
-}
-
-//
-func Redirect(w http.ResponseWriter, r *http.Request) {
-  log.Print("receivedFoursquareCallback")
-	state := r.FormValue("state")
-	if state != STATE_STR {
-		fmt.Printf("invalid oauth state, expected '%s', got '%s'\n", STATE_STR, state)
-		http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
+	state, err := newOAuthState()
+	if err != nil {
+		log.Print("failed to create oauth state")
+		http.Error(w, "login unavailable", http.StatusInternalServerError)
 		return
 	}
 
-  var ctx context.Context = appengine.NewContext(r)
+	http.SetCookie(w, &http.Cookie{
+		Name:     oauthStateCookieName,
+		Value:    state,
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   secureCookie(r),
+		SameSite: http.SameSiteLaxMode,
+	})
+
+	url := config.AuthConfig.AuthCodeURL(state)
+	http.Redirect(w, r, url, http.StatusTemporaryRedirect)
+}
+
+func Redirect(w http.ResponseWriter, r *http.Request) {
+	log.Print("received Foursquare callback")
+	state := r.FormValue("state")
+	stateCookie, err := r.Cookie(oauthStateCookieName)
+	if err != nil || stateCookie.Value == "" || state != stateCookie.Value {
+		log.Print("invalid oauth state")
+		http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
+		return
+	}
+	http.SetCookie(w, &http.Cookie{
+		Name:     oauthStateCookieName,
+		Path:     "/",
+		MaxAge:   -1,
+		HttpOnly: true,
+		Secure:   secureCookie(r),
+		SameSite: http.SameSiteLaxMode,
+	})
+
+	ctx := appengine.NewContext(r)
 	code := r.FormValue("code")
 	token, err := foursquareOauthConfig.Exchange(ctx, code)
 	if err != nil {
-		log.Print("oauthConf.Exchange() failed with '%s'\n", err)
+		log.Print("oauth exchange failed")
 		http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
 		return
 	}
 
-  log.Print("oAuth Confirmed")
-  user_url := "https://api.foursquare.com/v2/users/self?v=20170101&oauth_token=" + token.AccessToken
-  c := getHttpClient(r)
-  p, err := c.Get(user_url)
+	params := url.Values{}
+	params.Set("v", "20170101")
+	params.Set("oauth_token", token.AccessToken)
+	userURL := "https://api.foursquare.com/v2/users/self?" + params.Encode()
+	c := getHttpClient(r)
+	p, err := c.Get(userURL)
+	if err != nil {
+		log.Print("foursquare user request failed")
+		http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
+		return
+	}
+	defer p.Body.Close()
+	d, err := io.ReadAll(p.Body)
+	if err != nil {
+		log.Print("foursquare user response read failed")
+		http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
+		return
+	}
 
-  if err != nil {
-    log.Println(err)
-    http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
-    return
-  }
-  defer p.Body.Close()
-  d, _ := ioutil.ReadAll(p.Body)
+	user := new(fsq.UserResponse)
+	response := new(fsq.Response)
+	if err := json.Unmarshal(d, response); err != nil {
+		log.Print("foursquare user wrapper decode failed")
+		http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
+		return
+	}
+	if err := json.Unmarshal(response.Response, user); err != nil {
+		log.Print("foursquare user decode failed")
+		http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
+		return
+	}
 
-  // Map the resp
-  user := new(fsq.UserResponse)
-  response := new(fsq.Response)
+	newUser := &fsq.FoursquareUser{
+		ID:          user.User.ID,
+		Name:        user.User.FirstName,
+		AccessToken: token.AccessToken,
+	}
+	userKey := fsq.GetUserKey(newUser)
+	setAccessToken(r, newUser)
 
-  // More details via https://developer.foursquare.com/overview/responses
-  json.Unmarshal([]byte((string(d))), &response)
-  json.Unmarshal(response.Response, user)
-
-  log.Print(user)
-
-  //
-  // Setup Foursquare Client Config
-  newUser := &fsq.FoursquareUser{
-    ID: user.User.ID,
-    Name: user.User.FirstName,
-    AccessToken: token.AccessToken,
-  }
-
-  setAccessToken(r, newUser)
-  accessToken := getAccessToken(r, fsq.GetUserKey(newUser))
-
-  expiration := time.Now().Add(365 * 24 * time.Hour)
-  cookie := http.Cookie{Name: "fsq",
-                        Value: fsq.GetUserKey(newUser),
-                        Expires:expiration}
-  http.SetCookie(w, &cookie)
-  log.Print(accessToken)
-  http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
+	expiration := time.Now().Add(365 * 24 * time.Hour)
+	cookie := http.Cookie{
+		Name:     "fsq",
+		Value:    userKey,
+		Path:     "/",
+		Expires:  expiration,
+		HttpOnly: true,
+		Secure:   secureCookie(r),
+		SameSite: http.SameSiteLaxMode,
+	}
+	http.SetCookie(w, &cookie)
+	http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
 }
 
 // Process a request and cache using headers.
 func LoginProtect(fn http.HandlerFunc) http.HandlerFunc {
-  return func(w http.ResponseWriter, r *http.Request) {
-
-    cookie, _ := r.Cookie("fsq")
-    if cookie == nil {
-      http.Redirect(w, r, "/login", http.StatusTemporaryRedirect)
-    } else {
-      fn(w,r)
-    }
-  }
+	return func(w http.ResponseWriter, r *http.Request) {
+		cookie, _ := r.Cookie("fsq")
+		if cookie == nil {
+			http.Redirect(w, r, "/login", http.StatusTemporaryRedirect)
+			return
+		}
+		fn(w, r)
+	}
 }
 
 // Process a request and cache using headers.
 func Logout(w http.ResponseWriter, r *http.Request) {
-  cookie := http.Cookie{Name: "fsq", Path: "/", MaxAge: -1}
-  http.SetCookie(w, &cookie)
-  http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
+	cookie := http.Cookie{
+		Name:     "fsq",
+		Path:     "/",
+		MaxAge:   -1,
+		HttpOnly: true,
+		Secure:   secureCookie(r),
+		SameSite: http.SameSiteLaxMode,
+	}
+	http.SetCookie(w, &cookie)
+	http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
 }
-
 
 func getHttpClient(r *http.Request) http.Client {
 	return http.Client{Transport: &urlfetch.Transport{Context: appengine.NewContext(r)}}

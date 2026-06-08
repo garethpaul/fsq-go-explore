@@ -2,62 +2,87 @@
 package app
 
 import (
-  "html/template"
-  "net/http"
-  "fsq"
-  //"log"
-  "os"
+	"html/template"
+	"log"
+	"net/http"
+	"os"
+
+	"github.com/garethpaul/fsq-go-explore/fsq"
 )
 
 // [START Edit_Page]
 func EditPage(w http.ResponseWriter, r *http.Request) {
 
-  cookie, _ := r.Cookie("fsq")
-  accessToken := getAccessToken(r, cookie.Value)
-  if accessToken == "" {
-    http.Redirect(w, r, "/logout", http.StatusTemporaryRedirect)
-  }
+	cookie, err := r.Cookie("fsq")
+	if err != nil {
+		http.Redirect(w, r, "/login", http.StatusTemporaryRedirect)
+		return
+	}
 
-  t := template.Must(template.ParseFiles("templates/edit.html", "templates/navigation.html"))
+	accessToken := getAccessToken(r, cookie.Value)
+	if accessToken == "" {
+		http.Redirect(w, r, "/logout", http.StatusTemporaryRedirect)
+		return
+	}
 
-  // Setup Foursquare Client Config
-  c := &fsq.FoursquareConfig{
-    ClientId: 		os.Getenv("FSQ_CLIENT_ID"),
-    ClientSecret: os.Getenv("FSQ_CLIENT_SECRET"),
-    Client: 			getHttpClient(r),
-    Version: 			os.Getenv("FSQ_VERSION"),
-    AccessToken: accessToken,
-  }
+	t, err := template.ParseFiles("templates/edit.html", "templates/navigation.html")
+	if err != nil {
+		log.Printf("edit template parse failed: %v", err)
+		http.Error(w, "template error", http.StatusInternalServerError)
+		return
+	}
 
+	// Setup Foursquare Client Config
+	c := &fsq.FoursquareConfig{
+		ClientId:     os.Getenv("FSQ_CLIENT_ID"),
+		ClientSecret: os.Getenv("FSQ_CLIENT_SECRET"),
+		Client:       getHttpClient(r),
+		Version:      os.Getenv("FSQ_VERSION"),
+		AccessToken:  accessToken,
+	}
 
-  id := r.FormValue("id")
-  service := fsq.NewFoursquareService(c)
-  resp := service.VenueDetails(id)
-  t.Execute(w, resp)
+	id := r.FormValue("id")
+	service := fsq.NewFoursquareService(c)
+	resp := service.VenueDetails(id)
+	if err := t.Execute(w, resp); err != nil {
+		log.Printf("edit template render failed: %v", err)
+	}
 }
-// [END Edit_Page]
 
+// [END Edit_Page]
 
 func ProposeEdit(w http.ResponseWriter, r *http.Request) {
 
-  cookie, _ := r.Cookie("fsq")
-  accessToken := getAccessToken(r, cookie.Value)
+	cookie, err := r.Cookie("fsq")
+	if err != nil {
+		http.Redirect(w, r, "/login", http.StatusTemporaryRedirect)
+		return
+	}
 
-  // Setup Foursquare Client Config
-  c := &fsq.FoursquareConfig{
-    ClientId: 		os.Getenv("FSQ_CLIENT_ID"),
-    ClientSecret: os.Getenv("FSQ_CLIENT_SECRET"),
-    Client: 			getHttpClient(r),
-    Version: 			os.Getenv("FSQ_VERSION"),
-    AccessToken: accessToken,
-  }
+	accessToken := getAccessToken(r, cookie.Value)
+	if accessToken == "" {
+		http.Redirect(w, r, "/logout", http.StatusTemporaryRedirect)
+		return
+	}
 
-  id := r.FormValue("id")
-  r.ParseForm()
+	// Setup Foursquare Client Config
+	c := &fsq.FoursquareConfig{
+		ClientId:     os.Getenv("FSQ_CLIENT_ID"),
+		ClientSecret: os.Getenv("FSQ_CLIENT_SECRET"),
+		Client:       getHttpClient(r),
+		Version:      os.Getenv("FSQ_VERSION"),
+		AccessToken:  accessToken,
+	}
 
-  service := fsq.NewFoursquareService(c)
-  service.VenueEdit(id, r.PostForm)
+	id := r.FormValue("id")
+	if err := r.ParseForm(); err != nil {
+		log.Printf("venue edit form parse failed: %v", err)
+		http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
+		return
+	}
 
-  http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
-  //log.Print(r.PostForm)
+	service := fsq.NewFoursquareService(c)
+	service.VenueEdit(id, r.PostForm)
+
+	http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
 }

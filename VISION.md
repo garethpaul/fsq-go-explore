@@ -23,9 +23,22 @@ Priority:
 - Maintain caching behavior that respects platform policy
 - Keep the embedded limiter package understandable and documented
 
+Current baseline:
+
+- The Go module is defined by `go.mod` and `go.sum` with App Engine/OAuth/rate-limit
+  dependencies.
+- `scripts/check-baseline.sh` and `make check` run `go test ./...`, Go
+  formatting checks, module-import checks, and credential-log guardrails.
+- Internal imports use `github.com/garethpaul/fsq-go-explore/...` module paths.
+- The cache-key generation path uses stable SHA-256 digests rather than reversible
+  encrypted payloads.
+- Foursquare request logging avoids raw URLs, tokens, edit payloads, and user
+  records.
+- OAuth redirects use per-login state cookies rather than a shared static state
+  string.
+
 Next priorities:
 
-- Add tests around cache-key generation, rate limiting, and API request handling
 - Modernize App Engine Go runtime assumptions in a dedicated pass
 - Clarify secret handling for local and hosted environments
 - Separate reusable limiter concerns from demo-specific API code if needed

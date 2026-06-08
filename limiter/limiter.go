@@ -6,9 +6,10 @@ import (
 	"strconv"
 	"strings"
 	"time"
-  "limiter/config"
-  "limiter/errors"
-  "limiter/libstring"
+
+	"github.com/garethpaul/fsq-go-explore/limiter/config"
+	"github.com/garethpaul/fsq-go-explore/limiter/errors"
+	"github.com/garethpaul/fsq-go-explore/limiter/libstring"
 )
 
 // NewLimiter is a convenience function to config.NewLimiter.

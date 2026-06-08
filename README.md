@@ -12,8 +12,12 @@ This README is based on the checked-in source, manifests, scripts, and repositor
 ## Repository Contents
 
 - `README.md` - project overview and local usage notes
+- `CHANGES.md` - concise history of maintenance changes
+- `Makefile` - local verification entry point
+- `go.mod` and `go.sum` - Go module dependency metadata
 - `fsq` - source or example code
 - `limiter` - source or example code
+- `scripts/check-baseline.sh` - Go formatting, test, import, and credential-log checks
 - `SECURITY.md` - security reporting and disclosure guidance
 - `static` - source or example code
 - `templates` - source or example code
@@ -22,38 +26,54 @@ This README is based on the checked-in source, manifests, scripts, and repositor
 Additional scan context:
 
 - Source directories: fsq, limiter, static, templates
-- Dependency and build manifests: none detected
-- Entry points or build surfaces: main.go
-- Test-looking files: no obvious test files detected
+- Dependency and build manifests: go.mod, go.sum
+- Entry points or build surfaces: main.go, app.yaml
+- Test-looking files: search_test.go, fsq/keys_test.go
 
 ## Getting Started
 
 ### Prerequisites
 
 - Git
+- Go 1.25 or a compatible modern Go toolchain
 
 ### Setup
 
 ```bash
 git clone https://github.com/garethpaul/fsq-go-explore.git
 cd fsq-go-explore
+go mod download
 ```
 
 The setup commands above are derived from repository files. Legacy mobile, Python, or JavaScript samples may require older SDKs or package versions than a modern workstation uses by default.
 
 ## Running or Using the Project
 
-- Run `go run .` or build the module with `go build ./...`.
+- This is a legacy Google App Engine sample. Use the App Engine tooling that
+  matches `app.yaml` for local serving or deployment.
+- Configure `FSQ_CLIENT_ID`, `FSQ_CLIENT_SECRET`, and `FSQ_VERSION` through the
+  environment or deployment configuration. Do not commit real values.
 
 ## Testing and Verification
 
-- No dedicated automated test command was identified from the checked-in files. Verify changes by running the relevant build or manually exercising the sample.
+Run the baseline:
+
+```bash
+make check
+```
+
+The baseline runs `go test ./...`, verifies Go formatting, checks that module
+imports are used instead of GOPATH-era local imports, and guards against
+credential-adjacent logging.
 
 When the required SDK or runtime is unavailable, use static checks and source review first, then verify on a machine that has the matching platform toolchain.
 
 ## Configuration and Secrets
 
-- Detected references to Foursquare, Twitter. Keep API keys, OAuth credentials, tokens, and account-specific values in local configuration only.
+- Required Foursquare settings: `FSQ_CLIENT_ID`, `FSQ_CLIENT_SECRET`, and
+  `FSQ_VERSION`.
+- Keep API keys, OAuth credentials, access tokens, `.env` files, and
+  deployment-specific config out of source control.
 
 ## Security and Privacy Notes
 
@@ -61,9 +81,13 @@ When the required SDK or runtime is unavailable, use static checks and source re
 - Review changes touching external API calls or credential-adjacent configuration; examples from the scan include auth.go, edit.go, fsq/api.go, fsq/common.go, and 6 more.
 - Review changes touching network requests, sockets, or service endpoints; examples from the scan include auth.go, fsq/api.go, fsq/common.go, fsq/venue.go, and 3 more.
 - Review changes touching file, media, JSON, XML, CSV, OCR, or data parsing; examples from the scan include auth.go, fsq/api.go, fsq/common.go, fsq/keys.go, and 3 more.
+- Cache keys are deterministic SHA-256 digests and should not expose raw query,
+  token, or user fields.
 
 ## Maintenance Notes
 
+- Run `make check` before pushing changes that touch Foursquare API calls,
+  OAuth, cache keys, rate limiting, or App Engine imports.
 - See `SECURITY.md` for vulnerability reporting and safe research guidance.
 - See `VISION.md` for project direction and contribution guardrails.
 

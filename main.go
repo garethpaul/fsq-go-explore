@@ -3,8 +3,9 @@ package app
 
 import (
 	"net/http"
-	"limiter"
 	"time"
+
+	"github.com/garethpaul/fsq-go-explore/limiter"
 )
 
 func init() {
@@ -12,6 +13,6 @@ func init() {
 	http.HandleFunc("/login", Login)
 	http.HandleFunc("/redirect", Redirect)
 	http.HandleFunc("/edit", LoginProtect(EditPage))
-	http.HandleFunc("/propose_edit", ProposeEdit)
+	http.HandleFunc("/propose_edit", LoginProtect(ProposeEdit))
 	http.HandleFunc("/logout", Logout)
 }

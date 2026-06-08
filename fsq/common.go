@@ -39,11 +39,10 @@ type Group struct {
 
 // A Foursquare User Grouping
 type FoursquareUser struct {
-  ID               string       `json:"id"`
-	Name             string       `json:"name"`
-  AccessToken      string       `json:"access_token"`
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	AccessToken string `json:"access_token"`
 }
-
 
 // ID is a simple struct with just an id. VenuePage is an example.
 type ID struct {

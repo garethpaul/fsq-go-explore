@@ -30,7 +30,7 @@ Helpful reports include:
 - Review found network clients, sockets, web APIs, or service endpoints; changes in those areas should receive security-focused review before merge.
 - Review found mobile permission or privacy-sensitive data handling; changes in those areas should receive security-focused review before merge.
 - Review found file, document, data, or media parsing flows; changes in those areas should receive security-focused review before merge.
-- No primary dependency manifest was detected in the repository root. If dependencies are added later, include a manifest and prefer reproducible installation instructions.
+- Go dependency manifests are tracked in `go.mod` and `go.sum`. Keep them in sync with code changes and review App Engine, OAuth, and rate-limit dependency updates carefully.
 
 ## Service and API Notes
 
