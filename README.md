@@ -1,5 +1,8 @@
 # fsq-go-explore
 
+<!-- README-OVERVIEW-IMAGE -->
+![Project overview](docs/readme-overview.svg)
+
 ## Overview
 
 `garethpaul/fsq-go-explore` is a Go project. Foursquare GoLang Explore Sample
@@ -73,4 +76,3 @@ Keep changes small and tied to the project that is already present in this repos
 Prior README summary:
 
 > fsq-go-explore <!-- README-OVERVIEW-IMAGE --> Foursquare-Go-Explore =================== Getting Started ---------- Here are some steps to get you started. 1. Get your developer keys
-
