@@ -63,7 +63,13 @@ func ProposeEdit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id := strings.TrimSpace(r.FormValue("id"))
+	if err := r.ParseForm(); err != nil {
+		log.Print("venue edit form parse failed")
+		http.Error(w, "invalid venue edit form", http.StatusBadRequest)
+		return
+	}
+
+	id := strings.TrimSpace(r.Form.Get("id"))
 	if id == "" {
 		http.Error(w, "missing venue id", http.StatusBadRequest)
 		return
@@ -88,12 +94,6 @@ func ProposeEdit(w http.ResponseWriter, r *http.Request) {
 		Client:       getHttpClient(r),
 		Version:      os.Getenv("FSQ_VERSION"),
 		AccessToken:  accessToken,
-	}
-
-	if err := r.ParseForm(); err != nil {
-		log.Printf("venue edit form parse failed: %v", err)
-		http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
-		return
 	}
 
 	service := fsq.NewFoursquareService(c)

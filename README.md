@@ -72,11 +72,13 @@ used instead of GOPATH-era local imports, and guards against credential- and
 location-adjacent logging. It also covers state-changing venue edit submissions
 so non-POST requests are rejected before auth or Foursquare API work, and
 missing venue IDs are rejected before auth, template parsing, or venue API
-requests. Search query and location values are trimmed and length-bounded before
-venue search requests are built. OAuth callbacks reject missing authorization
-codes before exchange work starts. Auth cookies must carry generated user cache
-keys before access-token memcache lookup starts. ETag comparisons are exact, so
-partial `If-None-Match` values cannot trigger cached `304` responses.
+requests. Malformed edit forms are rejected before auth-cookie lookup or
+Foursquare edit work. Search query and location values are trimmed and
+length-bounded before venue search requests are built. OAuth callbacks reject
+missing authorization codes before exchange work starts. Auth cookies must carry
+generated user cache keys before access-token memcache lookup starts. ETag
+comparisons are exact, so partial `If-None-Match` values cannot trigger cached
+`304` responses.
 Protected routes validate generated auth cookie cache keys before calling
 handler code.
 
@@ -108,6 +110,8 @@ When the required SDK or runtime is unavailable, use static checks and source re
   Not Allowed`.
 - Missing venue IDs are rejected with `400 Bad Request` before edit-page auth,
   template parsing, or Foursquare venue detail/edit API work.
+- Malformed venue edit forms are rejected with `400 Bad Request` before
+  auth-cookie lookup, token cache work, or Foursquare edit API work.
 - Search query and location parameters are length-bounded before being sent to
   Foursquare or used in cache keys.
 - ETag comparisons are exact before `304 Not Modified` responses are returned.
@@ -125,6 +129,8 @@ When the required SDK or runtime is unavailable, use static checks and source re
   boundary.
 - See `docs/plans/2026-06-09-fsq-edit-page-id-first.md` for the edit-page
   malformed-request boundary.
+- See `docs/plans/2026-06-09-fsq-propose-edit-form-parse-boundary.md` for the
+  venue edit form-parse boundary.
 - See `docs/plans/2026-06-09-fsq-search-param-length.md` for search parameter
   length guardrails.
 - See `docs/plans/2026-06-09-fsq-oauth-code-boundary.md` for the OAuth callback

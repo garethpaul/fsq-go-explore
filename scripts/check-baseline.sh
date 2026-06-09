@@ -12,6 +12,7 @@ MAKE_GATES_PLAN="$ROOT_DIR/docs/plans/2026-06-09-fsq-go-make-gate-aliases.md"
 USER_CACHE_KEY_PLAN="$ROOT_DIR/docs/plans/2026-06-09-fsq-user-cache-key-boundary.md"
 ETAG_MATCH_PLAN="$ROOT_DIR/docs/plans/2026-06-09-fsq-etag-exact-match.md"
 LOGIN_PROTECT_KEY_PLAN="$ROOT_DIR/docs/plans/2026-06-09-fsq-login-protect-cache-key.md"
+EDIT_FORM_PARSE_PLAN="$ROOT_DIR/docs/plans/2026-06-09-fsq-propose-edit-form-parse-boundary.md"
 
 require_file() {
   path=$1
@@ -47,6 +48,7 @@ for path in \
   "fsq/keys_test.go" \
   "limiter/limiter.go" \
   "docs/plans/2026-06-09-fsq-login-protect-cache-key.md" \
+  "docs/plans/2026-06-09-fsq-propose-edit-form-parse-boundary.md" \
   "docs/plans/2026-06-09-fsq-etag-exact-match.md" \
   "docs/plans/2026-06-09-fsq-search-param-length.md" \
   "docs/plans/2026-06-09-fsq-edit-page-id-first.md" \
@@ -168,6 +170,14 @@ if ! grep -Fq 'strings.TrimSpace(r.FormValue("id"))' "$ROOT_DIR/edit.go" ||
   exit 1
 fi
 
+if ! grep -Fq 'strings.TrimSpace(r.Form.Get("id"))' "$ROOT_DIR/edit.go" ||
+  ! grep -Fq "invalid venue edit form" "$ROOT_DIR/edit.go" ||
+  ! grep -Fq "venue edit form parse failed" "$ROOT_DIR/edit.go" ||
+  ! grep -Fq "TestProposeEditRejectsMalformedFormBeforeAuth" "$ROOT_DIR/edit_test.go"; then
+  printf '%s\n' "Venue edit submissions must reject malformed forms before auth or Foursquare work." >&2
+  exit 1
+fi
+
 if ! grep -Fq "go test ./..." "$ROOT_DIR/README.md" ||
   ! grep -Fq "make lint" "$ROOT_DIR/README.md" ||
   ! grep -Fq "make test" "$ROOT_DIR/README.md" ||
@@ -175,6 +185,7 @@ if ! grep -Fq "go test ./..." "$ROOT_DIR/README.md" ||
   ! grep -Fq "make check" "$ROOT_DIR/README.md" ||
   ! grep -Fq "non-POST requests are rejected" "$ROOT_DIR/README.md" ||
   ! grep -Fq "missing venue IDs are rejected" "$ROOT_DIR/README.md" ||
+  ! grep -Fq "Malformed edit forms are rejected" "$ROOT_DIR/README.md" ||
   ! grep -Fq "length-bounded" "$ROOT_DIR/README.md" ||
   ! grep -Fq "missing OAuth authorization codes are rejected" "$ROOT_DIR/README.md" ||
   ! grep -Fq "ETag comparisons are exact" "$ROOT_DIR/README.md" ||
@@ -192,6 +203,7 @@ if ! grep -Fq "scripts/check-baseline.sh" "$ROOT_DIR/VISION.md" ||
   ! grep -Fq "cache-key generation" "$ROOT_DIR/VISION.md" ||
   ! grep -Fq "Venue edit submissions reject non-POST requests" "$ROOT_DIR/VISION.md" ||
   ! grep -Fq "missing venue IDs" "$ROOT_DIR/VISION.md" ||
+  ! grep -Fq "malformed edit forms" "$ROOT_DIR/VISION.md" ||
   ! grep -Fq "missing OAuth authorization codes" "$ROOT_DIR/VISION.md" ||
   ! grep -Fq "ETag comparisons are exact" "$ROOT_DIR/VISION.md" ||
   ! grep -Fq "Protected routes validate generated auth cookie cache keys" "$ROOT_DIR/VISION.md" ||
@@ -199,6 +211,11 @@ if ! grep -Fq "scripts/check-baseline.sh" "$ROOT_DIR/VISION.md" ||
   ! grep -Fq "length-bounded" "$ROOT_DIR/VISION.md" ||
   ! grep -Fq "Go module" "$ROOT_DIR/VISION.md"; then
   printf '%s\n' "VISION must describe the current Go baseline." >&2
+  exit 1
+fi
+
+if ! grep -Fq "Malformed venue edit forms should be rejected" "$ROOT_DIR/SECURITY.md"; then
+  printf '%s\n' "SECURITY must document the malformed venue edit form boundary." >&2
   exit 1
 fi
 
@@ -252,8 +269,18 @@ if ! grep -Fq "status: completed" "$LOGIN_PROTECT_KEY_PLAN"; then
   exit 1
 fi
 
+if ! grep -Fq "status: completed" "$EDIT_FORM_PARSE_PLAN"; then
+  printf '%s\n' "Edit form parse boundary plan must be marked completed." >&2
+  exit 1
+fi
+
 if ! grep -Fq "make check" "$LOGIN_PROTECT_KEY_PLAN"; then
   printf '%s\n' "Login protect cache key plan must record make check verification." >&2
+  exit 1
+fi
+
+if ! grep -Fq "make check" "$EDIT_FORM_PARSE_PLAN"; then
+  printf '%s\n' "Edit form parse boundary plan must record make check verification." >&2
   exit 1
 fi
 

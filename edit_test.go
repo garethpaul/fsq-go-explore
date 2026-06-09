@@ -3,6 +3,7 @@ package app
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -46,5 +47,23 @@ func TestProposeEditRejectsMissingVenueID(t *testing.T) {
 		if rr.Code != http.StatusBadRequest {
 			t.Fatalf("%s status = %d, want %d", path, rr.Code, http.StatusBadRequest)
 		}
+	}
+}
+
+func TestProposeEditRejectsMalformedFormBeforeAuth(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/propose_edit?id=venue-1", strings.NewReader("%"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rr := httptest.NewRecorder()
+
+	ProposeEdit(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", rr.Code, http.StatusBadRequest)
+	}
+	if location := rr.Header().Get("Location"); location != "" {
+		t.Fatalf("redirect location = %q, want none", location)
+	}
+	if !strings.Contains(rr.Body.String(), "invalid venue edit form") {
+		t.Fatalf("body = %q, want invalid venue edit form", rr.Body.String())
 	}
 }

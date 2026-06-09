@@ -2,6 +2,7 @@
 
 ## 2026-06-09
 
+- Rejected malformed venue edit forms before auth or Foursquare edit work.
 - Rejected malformed auth-cookie cache keys in the protected-route wrapper
   before handler work starts.
 - Made header-cache ETag comparisons exact so partial `If-None-Match` values
