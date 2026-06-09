@@ -2,6 +2,8 @@ package app
 
 import (
 	"net/http/httptest"
+	"net/url"
+	"strings"
 	"testing"
 )
 
@@ -40,5 +42,23 @@ func TestSearchParamParserDefaultsLocation(t *testing.T) {
 	}
 	if got.Near != "Chicago, IL" {
 		t.Fatalf("Near = %q, want Chicago, IL", got.Near)
+	}
+}
+
+func TestSearchParamParserLimitsLongInputs(t *testing.T) {
+	longValue := strings.Repeat("x", maxSearchParamRunes+25)
+	values := url.Values{
+		"query": []string{longValue},
+		"near":  []string{longValue},
+	}
+	req := httptest.NewRequest("GET", "/?"+values.Encode(), nil)
+
+	got := SearchParamParser(req)
+
+	if len([]rune(got.Query)) != maxSearchParamRunes {
+		t.Fatalf("Query length = %d, want %d", len([]rune(got.Query)), maxSearchParamRunes)
+	}
+	if len([]rune(got.Near)) != maxSearchParamRunes {
+		t.Fatalf("Near length = %d, want %d", len([]rune(got.Near)), maxSearchParamRunes)
 	}
 }

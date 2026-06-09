@@ -35,6 +35,8 @@ Helpful reports include:
 ## Service and API Notes
 
 For web services, APIs, sockets, or scraping workflows, prioritize reports involving authentication bypass, authorization errors, injection, server-side request forgery, unsafe deserialization, credential leakage, data exposure, or denial-of-service conditions. Use test accounts and minimal proof-of-concept traffic only.
+Search query and location parameters should stay length-bounded before they are
+sent to Foursquare or used in cache keys.
 
 ## Dependency and Supply Chain Security
 

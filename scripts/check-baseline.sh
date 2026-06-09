@@ -5,6 +5,7 @@ ROOT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 PLAN="$ROOT_DIR/docs/plans/2026-06-08-fsq-go-explore-go-baseline.md"
 EDIT_PLAN="$ROOT_DIR/docs/plans/2026-06-09-fsq-propose-edit-post-only.md"
 VENUE_ID_PLAN="$ROOT_DIR/docs/plans/2026-06-09-fsq-venue-id-boundary.md"
+SEARCH_PARAM_PLAN="$ROOT_DIR/docs/plans/2026-06-09-fsq-search-param-length.md"
 
 require_file() {
   path=$1
@@ -38,6 +39,7 @@ for path in \
   "fsq/keys.go" \
   "fsq/keys_test.go" \
   "limiter/limiter.go" \
+  "docs/plans/2026-06-09-fsq-search-param-length.md" \
   "docs/plans/2026-06-09-fsq-venue-id-boundary.md" \
   "docs/plans/2026-06-09-fsq-propose-edit-post-only.md" \
   "docs/plans/2026-06-08-fsq-go-explore-go-baseline.md"; do
@@ -94,6 +96,13 @@ if ! grep -Fq "appEngineLocationFallback" "$ROOT_DIR/search.go" ||
   exit 1
 fi
 
+if ! grep -Fq "const maxSearchParamRunes" "$ROOT_DIR/search.go" ||
+  ! grep -Fq "func normalizeSearchParam" "$ROOT_DIR/search.go" ||
+  ! grep -Fq "TestSearchParamParserLimitsLongInputs" "$ROOT_DIR/search_test.go"; then
+  printf '%s\n' "Search parameter parsing must trim and bound query/location inputs with test coverage." >&2
+  exit 1
+fi
+
 if ! grep -Fq "r.Method != http.MethodPost" "$ROOT_DIR/edit.go" ||
   ! grep -Fq "http.StatusMethodNotAllowed" "$ROOT_DIR/edit.go" ||
   ! grep -Fq "TestProposeEditRejectsNonPostRequests" "$ROOT_DIR/edit_test.go"; then
@@ -113,6 +122,7 @@ if ! grep -Fq "go test ./..." "$ROOT_DIR/README.md" ||
   ! grep -Fq "make check" "$ROOT_DIR/README.md" ||
   ! grep -Fq "non-POST requests are rejected" "$ROOT_DIR/README.md" ||
   ! grep -Fq "missing venue IDs are rejected" "$ROOT_DIR/README.md" ||
+  ! grep -Fq "length-bounded" "$ROOT_DIR/README.md" ||
   ! grep -Fq "FSQ_CLIENT_ID" "$ROOT_DIR/README.md"; then
   printf '%s\n' "README must document Go verification and Foursquare env configuration." >&2
   exit 1
@@ -122,6 +132,7 @@ if ! grep -Fq "scripts/check-baseline.sh" "$ROOT_DIR/VISION.md" ||
   ! grep -Fq "cache-key generation" "$ROOT_DIR/VISION.md" ||
   ! grep -Fq "Venue edit submissions reject non-POST requests" "$ROOT_DIR/VISION.md" ||
   ! grep -Fq "missing venue IDs" "$ROOT_DIR/VISION.md" ||
+  ! grep -Fq "length-bounded" "$ROOT_DIR/VISION.md" ||
   ! grep -Fq "Go module" "$ROOT_DIR/VISION.md"; then
   printf '%s\n' "VISION must describe the current Go baseline." >&2
   exit 1
@@ -139,6 +150,11 @@ fi
 
 if ! grep -Fq "status: completed" "$VENUE_ID_PLAN"; then
   printf '%s\n' "Venue ID boundary plan must be marked completed." >&2
+  exit 1
+fi
+
+if ! grep -Fq "status: completed" "$SEARCH_PARAM_PLAN"; then
+  printf '%s\n' "Search parameter length plan must be marked completed." >&2
   exit 1
 fi
 

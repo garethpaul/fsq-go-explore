@@ -8,11 +8,13 @@ import (
 	"github.com/garethpaul/fsq-go-explore/fsq"
 )
 
+const maxSearchParamRunes = 120
+
 // SearchParamParser takes a http request and returns a venue request struct.
 func SearchParamParser(r *http.Request) (vsr *fsq.VenueSearchRequest) {
 	// Take data from our search form and parse this into a struct
-	query := strings.TrimSpace(r.FormValue("query"))
-	near := strings.TrimSpace(r.FormValue("near"))
+	query := normalizeSearchParam(r.FormValue("query"))
+	near := normalizeSearchParam(r.FormValue("near"))
 	if query == "" {
 		query = "coffee"
 	}
@@ -29,8 +31,8 @@ func SearchParamParser(r *http.Request) (vsr *fsq.VenueSearchRequest) {
 }
 
 func appEngineLocationFallback(r *http.Request) string {
-	city := strings.TrimSpace(r.Header.Get("X-AppEngine-City"))
-	region := strings.TrimSpace(r.Header.Get("X-AppEngine-Region"))
+	city := normalizeSearchParam(r.Header.Get("X-AppEngine-City"))
+	region := normalizeSearchParam(r.Header.Get("X-AppEngine-Region"))
 
 	switch {
 	case city != "" && region != "":
@@ -42,4 +44,13 @@ func appEngineLocationFallback(r *http.Request) string {
 	default:
 		return "Chicago, IL"
 	}
+}
+
+func normalizeSearchParam(value string) string {
+	value = strings.TrimSpace(value)
+	runes := []rune(value)
+	if len(runes) <= maxSearchParamRunes {
+		return value
+	}
+	return string(runes[:maxSearchParamRunes])
 }
