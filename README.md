@@ -74,7 +74,8 @@ so non-POST requests are rejected before auth or Foursquare API work, and
 missing venue IDs are rejected before auth, template parsing, or venue API
 requests. Search query and location values are trimmed and length-bounded before
 venue search requests are built. OAuth callbacks reject missing authorization
-codes before exchange work starts.
+codes before exchange work starts. Auth cookies must carry generated user cache
+keys before access-token memcache lookup starts.
 
 When the required SDK or runtime is unavailable, use static checks and source review first, then verify on a machine that has the matching platform toolchain.
 
@@ -96,6 +97,8 @@ When the required SDK or runtime is unavailable, use static checks and source re
 - OAuth login uses per-request state values and HTTP-only cookies for callback
   validation.
 - OAuth callbacks with matching state still fail before token exchange; missing OAuth authorization codes are rejected.
+- Auth cookie values are validated as generated user cache keys before memcache
+  lookup, so malformed cookie values do not reach access-token cache work.
 - Venue edit submissions are POST-only; non-POST requests receive `405 Method
   Not Allowed`.
 - Missing venue IDs are rejected with `400 Bad Request` before edit-page auth,
@@ -122,6 +125,8 @@ When the required SDK or runtime is unavailable, use static checks and source re
   authorization-code boundary.
 - See `docs/plans/2026-06-09-fsq-go-make-gate-aliases.md` for local
   verification target guardrails.
+- See `docs/plans/2026-06-09-fsq-user-cache-key-boundary.md` for the auth
+  cookie user cache key boundary.
 
 ## Contributing
 

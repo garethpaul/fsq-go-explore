@@ -9,6 +9,7 @@ SEARCH_PARAM_PLAN="$ROOT_DIR/docs/plans/2026-06-09-fsq-search-param-length.md"
 EDIT_ID_FIRST_PLAN="$ROOT_DIR/docs/plans/2026-06-09-fsq-edit-page-id-first.md"
 OAUTH_CODE_PLAN="$ROOT_DIR/docs/plans/2026-06-09-fsq-oauth-code-boundary.md"
 MAKE_GATES_PLAN="$ROOT_DIR/docs/plans/2026-06-09-fsq-go-make-gate-aliases.md"
+USER_CACHE_KEY_PLAN="$ROOT_DIR/docs/plans/2026-06-09-fsq-user-cache-key-boundary.md"
 
 require_file() {
   path=$1
@@ -45,6 +46,7 @@ for path in \
   "docs/plans/2026-06-09-fsq-search-param-length.md" \
   "docs/plans/2026-06-09-fsq-edit-page-id-first.md" \
   "docs/plans/2026-06-09-fsq-go-make-gate-aliases.md" \
+  "docs/plans/2026-06-09-fsq-user-cache-key-boundary.md" \
   "docs/plans/2026-06-09-fsq-oauth-code-boundary.md" \
   "docs/plans/2026-06-09-fsq-venue-id-boundary.md" \
   "docs/plans/2026-06-09-fsq-propose-edit-post-only.md" \
@@ -94,6 +96,16 @@ if ! grep -Fq 'strings.TrimSpace(r.FormValue("code"))' "$ROOT_DIR/auth.go" ||
   ! grep -Fq "http.StatusBadRequest" "$ROOT_DIR/auth.go" ||
   ! grep -Fq "TestRedirectRejectsMissingAuthorizationCodeBeforeExchange" "$ROOT_DIR/auth_test.go"; then
   printf '%s\n' "OAuth callbacks must reject missing authorization codes before exchange work." >&2
+  exit 1
+fi
+
+if ! grep -Fq "const userCacheKeyPrefix = \"user:\"" "$ROOT_DIR/auth.go" ||
+  ! grep -Fq "func validUserCacheKey" "$ROOT_DIR/auth.go" ||
+  ! grep -Fq "len(digest) != 64" "$ROOT_DIR/auth.go" ||
+  ! grep -Fq "if !validUserCacheKey(key)" "$ROOT_DIR/auth.go" ||
+  ! grep -Fq "TestValidUserCacheKeyAcceptsGeneratedUserKeys" "$ROOT_DIR/auth_test.go" ||
+  ! grep -Fq "TestGetAccessTokenRejectsMalformedCacheKeysBeforeLookup" "$ROOT_DIR/auth_test.go"; then
+  printf '%s\n' "Foursquare auth cookies must validate generated user cache keys before memcache lookup." >&2
   exit 1
 fi
 
@@ -149,6 +161,7 @@ if ! grep -Fq "go test ./..." "$ROOT_DIR/README.md" ||
   ! grep -Fq "missing venue IDs are rejected" "$ROOT_DIR/README.md" ||
   ! grep -Fq "length-bounded" "$ROOT_DIR/README.md" ||
   ! grep -Fq "missing OAuth authorization codes are rejected" "$ROOT_DIR/README.md" ||
+  ! grep -Fq "user cache keys" "$ROOT_DIR/README.md" ||
   ! grep -Fq "FSQ_CLIENT_ID" "$ROOT_DIR/README.md"; then
   printf '%s\n' "README must document Go verification and Foursquare env configuration." >&2
   exit 1
@@ -162,6 +175,7 @@ if ! grep -Fq "scripts/check-baseline.sh" "$ROOT_DIR/VISION.md" ||
   ! grep -Fq "Venue edit submissions reject non-POST requests" "$ROOT_DIR/VISION.md" ||
   ! grep -Fq "missing venue IDs" "$ROOT_DIR/VISION.md" ||
   ! grep -Fq "missing OAuth authorization codes" "$ROOT_DIR/VISION.md" ||
+  ! grep -Fq "user cache keys" "$ROOT_DIR/VISION.md" ||
   ! grep -Fq "length-bounded" "$ROOT_DIR/VISION.md" ||
   ! grep -Fq "Go module" "$ROOT_DIR/VISION.md"; then
   printf '%s\n' "VISION must describe the current Go baseline." >&2
@@ -200,6 +214,11 @@ fi
 
 if ! grep -Fq "status: completed" "$MAKE_GATES_PLAN"; then
   printf '%s\n' "Make gate alias plan must be marked completed." >&2
+  exit 1
+fi
+
+if ! grep -Fq "status: completed" "$USER_CACHE_KEY_PLAN"; then
+  printf '%s\n' "User cache key boundary plan must be marked completed." >&2
   exit 1
 fi
 

@@ -5,6 +5,8 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/garethpaul/fsq-go-explore/fsq"
 )
 
 func TestNewOAuthStateReturnsDistinctOpaqueValues(t *testing.T) {
@@ -40,5 +42,28 @@ func TestRedirectRejectsMissingAuthorizationCodeBeforeExchange(t *testing.T) {
 	}
 	if !strings.Contains(rr.Body.String(), "missing authorization code") {
 		t.Fatalf("body = %q, want missing authorization code", rr.Body.String())
+	}
+}
+
+func TestValidUserCacheKeyAcceptsGeneratedUserKeys(t *testing.T) {
+	key := fsq.GetUserKey(&fsq.FoursquareUser{ID: "user-1", Name: "Example", AccessToken: "token"})
+
+	if !validUserCacheKey(key) {
+		t.Fatalf("validUserCacheKey(%q) = false, want true", key)
+	}
+}
+
+func TestGetAccessTokenRejectsMalformedCacheKeysBeforeLookup(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	for _, key := range []string{
+		"",
+		"search:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+		"user:not-hex",
+		"user:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdeg",
+		"user:" + strings.Repeat("a", 300),
+	} {
+		if token := getAccessToken(req, key); token != "" {
+			t.Fatalf("getAccessToken(%q) = %q, want empty token", key, token)
+		}
 	}
 }

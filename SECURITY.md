@@ -39,6 +39,8 @@ Search query and location parameters should stay length-bounded before they are
 sent to Foursquare or used in cache keys.
 OAuth callbacks should reject missing authorization codes before token exchange
 work starts, even when the state cookie matches.
+Auth cookies should validate generated user cache keys before memcache lookup so
+malformed cookie values do not reach access-token cache work.
 
 ## Dependency and Supply Chain Security
 

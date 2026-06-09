@@ -38,6 +38,8 @@ var (
 	oauthStateCookieName = "fsq_oauth_state"
 )
 
+const userCacheKeyPrefix = "user:"
+
 func newOAuthState() (string, error) {
 	bytes := make([]byte, 32)
 	if _, err := rand.Read(bytes); err != nil {
@@ -51,7 +53,7 @@ func secureCookie(r *http.Request) bool {
 }
 
 func getAccessToken(r *http.Request, key string) string {
-	if key == "" {
+	if !validUserCacheKey(key) {
 		return ""
 	}
 	ctx := appengine.NewContext(r)
@@ -70,6 +72,22 @@ func getAccessToken(r *http.Request, key string) string {
 		return ""
 	}
 	return user.AccessToken
+}
+
+func validUserCacheKey(key string) bool {
+	if !strings.HasPrefix(key, userCacheKeyPrefix) {
+		return false
+	}
+	digest := strings.TrimPrefix(key, userCacheKeyPrefix)
+	if len(digest) != 64 {
+		return false
+	}
+	for _, ch := range digest {
+		if (ch < '0' || ch > '9') && (ch < 'a' || ch > 'f') {
+			return false
+		}
+	}
+	return true
 }
 
 func setAccessToken(r *http.Request, fsqUser *fsq.FoursquareUser) {
