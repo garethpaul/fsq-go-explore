@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/garethpaul/fsq-go-explore/fsq"
@@ -117,6 +118,22 @@ func Redirect(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
 		return
 	}
+
+	code := strings.TrimSpace(r.FormValue("code"))
+	if code == "" {
+		log.Print("missing oauth code")
+		http.SetCookie(w, &http.Cookie{
+			Name:     oauthStateCookieName,
+			Path:     "/",
+			MaxAge:   -1,
+			HttpOnly: true,
+			Secure:   secureCookie(r),
+			SameSite: http.SameSiteLaxMode,
+		})
+		http.Error(w, "missing authorization code", http.StatusBadRequest)
+		return
+	}
+
 	http.SetCookie(w, &http.Cookie{
 		Name:     oauthStateCookieName,
 		Path:     "/",
@@ -127,7 +144,6 @@ func Redirect(w http.ResponseWriter, r *http.Request) {
 	})
 
 	ctx := appengine.NewContext(r)
-	code := r.FormValue("code")
 	token, err := foursquareOauthConfig.Exchange(ctx, code)
 	if err != nil {
 		log.Print("oauth exchange failed")

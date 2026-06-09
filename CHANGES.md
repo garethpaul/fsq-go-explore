@@ -13,6 +13,8 @@
 - Rejected missing edit-page venue IDs before auth and template work.
 - Bounded search query and location parameters before Foursquare venue search
   requests are built.
+- Rejected OAuth callbacks with missing authorization codes before token exchange
+  work starts.
 - Removed credential- and location-adjacent logging from OAuth, search, and Foursquare API flows.
 - Added tests for cache-key behavior, OAuth state generation, venue path escaping, and App Engine location fallback parsing.
 - Added `make check` and `scripts/check-baseline.sh` for formatting, tests, and static guardrails.

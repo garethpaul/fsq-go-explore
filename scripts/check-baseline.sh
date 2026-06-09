@@ -7,6 +7,7 @@ EDIT_PLAN="$ROOT_DIR/docs/plans/2026-06-09-fsq-propose-edit-post-only.md"
 VENUE_ID_PLAN="$ROOT_DIR/docs/plans/2026-06-09-fsq-venue-id-boundary.md"
 SEARCH_PARAM_PLAN="$ROOT_DIR/docs/plans/2026-06-09-fsq-search-param-length.md"
 EDIT_ID_FIRST_PLAN="$ROOT_DIR/docs/plans/2026-06-09-fsq-edit-page-id-first.md"
+OAUTH_CODE_PLAN="$ROOT_DIR/docs/plans/2026-06-09-fsq-oauth-code-boundary.md"
 
 require_file() {
   path=$1
@@ -42,6 +43,7 @@ for path in \
   "limiter/limiter.go" \
   "docs/plans/2026-06-09-fsq-search-param-length.md" \
   "docs/plans/2026-06-09-fsq-edit-page-id-first.md" \
+  "docs/plans/2026-06-09-fsq-oauth-code-boundary.md" \
   "docs/plans/2026-06-09-fsq-venue-id-boundary.md" \
   "docs/plans/2026-06-09-fsq-propose-edit-post-only.md" \
   "docs/plans/2026-06-08-fsq-go-explore-go-baseline.md"; do
@@ -75,6 +77,14 @@ if ! grep -Fq "newOAuthState" "$ROOT_DIR/auth.go" ||
   ! grep -Fq "oauthStateCookieName" "$ROOT_DIR/auth.go" ||
   ! grep -Fq "TestNewOAuthStateReturnsDistinctOpaqueValues" "$ROOT_DIR/auth_test.go"; then
   printf '%s\n' "OAuth redirects must use tested per-login state cookies." >&2
+  exit 1
+fi
+
+if ! grep -Fq 'strings.TrimSpace(r.FormValue("code"))' "$ROOT_DIR/auth.go" ||
+  ! grep -Fq "missing authorization code" "$ROOT_DIR/auth.go" ||
+  ! grep -Fq "http.StatusBadRequest" "$ROOT_DIR/auth.go" ||
+  ! grep -Fq "TestRedirectRejectsMissingAuthorizationCodeBeforeExchange" "$ROOT_DIR/auth_test.go"; then
+  printf '%s\n' "OAuth callbacks must reject missing authorization codes before exchange work." >&2
   exit 1
 fi
 
@@ -126,6 +136,7 @@ if ! grep -Fq "go test ./..." "$ROOT_DIR/README.md" ||
   ! grep -Fq "non-POST requests are rejected" "$ROOT_DIR/README.md" ||
   ! grep -Fq "missing venue IDs are rejected" "$ROOT_DIR/README.md" ||
   ! grep -Fq "length-bounded" "$ROOT_DIR/README.md" ||
+  ! grep -Fq "missing OAuth authorization codes are rejected" "$ROOT_DIR/README.md" ||
   ! grep -Fq "FSQ_CLIENT_ID" "$ROOT_DIR/README.md"; then
   printf '%s\n' "README must document Go verification and Foursquare env configuration." >&2
   exit 1
@@ -135,6 +146,7 @@ if ! grep -Fq "scripts/check-baseline.sh" "$ROOT_DIR/VISION.md" ||
   ! grep -Fq "cache-key generation" "$ROOT_DIR/VISION.md" ||
   ! grep -Fq "Venue edit submissions reject non-POST requests" "$ROOT_DIR/VISION.md" ||
   ! grep -Fq "missing venue IDs" "$ROOT_DIR/VISION.md" ||
+  ! grep -Fq "missing OAuth authorization codes" "$ROOT_DIR/VISION.md" ||
   ! grep -Fq "length-bounded" "$ROOT_DIR/VISION.md" ||
   ! grep -Fq "Go module" "$ROOT_DIR/VISION.md"; then
   printf '%s\n' "VISION must describe the current Go baseline." >&2
@@ -163,6 +175,11 @@ fi
 
 if ! grep -Fq "status: completed" "$EDIT_ID_FIRST_PLAN"; then
   printf '%s\n' "Edit-page ID-first plan must be marked completed." >&2
+  exit 1
+fi
+
+if ! grep -Fq "status: completed" "$OAUTH_CODE_PLAN"; then
+  printf '%s\n' "OAuth code boundary plan must be marked completed." >&2
   exit 1
 fi
 

@@ -68,7 +68,8 @@ credential- and location-adjacent logging. It also covers state-changing venue
 edit submissions so non-POST requests are rejected before auth or Foursquare API
 work, and missing venue IDs are rejected before auth, template parsing, or venue
 API requests. Search query and location values are trimmed and length-bounded
-before venue search requests are built.
+before venue search requests are built. OAuth callbacks reject missing
+authorization codes before exchange work starts.
 
 When the required SDK or runtime is unavailable, use static checks and source review first, then verify on a machine that has the matching platform toolchain.
 
@@ -89,6 +90,7 @@ When the required SDK or runtime is unavailable, use static checks and source re
   token, or user fields.
 - OAuth login uses per-request state values and HTTP-only cookies for callback
   validation.
+- OAuth callbacks with matching state still fail before token exchange; missing OAuth authorization codes are rejected.
 - Venue edit submissions are POST-only; non-POST requests receive `405 Method
   Not Allowed`.
 - Missing venue IDs are rejected with `400 Bad Request` before edit-page auth,
@@ -110,6 +112,8 @@ When the required SDK or runtime is unavailable, use static checks and source re
   malformed-request boundary.
 - See `docs/plans/2026-06-09-fsq-search-param-length.md` for search parameter
   length guardrails.
+- See `docs/plans/2026-06-09-fsq-oauth-code-boundary.md` for the OAuth callback
+  authorization-code boundary.
 
 ## Contributing
 
