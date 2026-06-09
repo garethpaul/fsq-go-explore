@@ -3,6 +3,7 @@ set -eu
 
 ROOT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 PLAN="$ROOT_DIR/docs/plans/2026-06-08-fsq-go-explore-go-baseline.md"
+EDIT_PLAN="$ROOT_DIR/docs/plans/2026-06-09-fsq-propose-edit-post-only.md"
 
 require_file() {
   path=$1
@@ -26,6 +27,7 @@ for path in \
   "auth_test.go" \
   "cache.go" \
   "edit.go" \
+  "edit_test.go" \
   "main.go" \
   "pages.go" \
   "search.go" \
@@ -35,6 +37,7 @@ for path in \
   "fsq/keys.go" \
   "fsq/keys_test.go" \
   "limiter/limiter.go" \
+  "docs/plans/2026-06-09-fsq-propose-edit-post-only.md" \
   "docs/plans/2026-06-08-fsq-go-explore-go-baseline.md"; do
   require_file "$path"
 done
@@ -89,8 +92,16 @@ if ! grep -Fq "appEngineLocationFallback" "$ROOT_DIR/search.go" ||
   exit 1
 fi
 
+if ! grep -Fq "r.Method != http.MethodPost" "$ROOT_DIR/edit.go" ||
+  ! grep -Fq "http.StatusMethodNotAllowed" "$ROOT_DIR/edit.go" ||
+  ! grep -Fq "TestProposeEditRejectsNonPostRequests" "$ROOT_DIR/edit_test.go"; then
+  printf '%s\n' "Venue edit submissions must reject non-POST requests with test coverage." >&2
+  exit 1
+fi
+
 if ! grep -Fq "go test ./..." "$ROOT_DIR/README.md" ||
   ! grep -Fq "make check" "$ROOT_DIR/README.md" ||
+  ! grep -Fq "non-POST requests are rejected" "$ROOT_DIR/README.md" ||
   ! grep -Fq "FSQ_CLIENT_ID" "$ROOT_DIR/README.md"; then
   printf '%s\n' "README must document Go verification and Foursquare env configuration." >&2
   exit 1
@@ -98,6 +109,7 @@ fi
 
 if ! grep -Fq "scripts/check-baseline.sh" "$ROOT_DIR/VISION.md" ||
   ! grep -Fq "cache-key generation" "$ROOT_DIR/VISION.md" ||
+  ! grep -Fq "Venue edit submissions reject non-POST requests" "$ROOT_DIR/VISION.md" ||
   ! grep -Fq "Go module" "$ROOT_DIR/VISION.md"; then
   printf '%s\n' "VISION must describe the current Go baseline." >&2
   exit 1
@@ -105,6 +117,11 @@ fi
 
 if ! grep -Fq "status: completed" "$PLAN"; then
   printf '%s\n' "Plan must be marked completed." >&2
+  exit 1
+fi
+
+if ! grep -Fq "status: completed" "$EDIT_PLAN"; then
+  printf '%s\n' "Venue edit POST-only plan must be marked completed." >&2
   exit 1
 fi
 

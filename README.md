@@ -64,7 +64,9 @@ make check
 
 The baseline runs `go test ./...`, verifies Go formatting, checks that module
 imports are used instead of GOPATH-era local imports, and guards against
-credential- and location-adjacent logging.
+credential- and location-adjacent logging. It also covers state-changing venue
+edit submissions so non-POST requests are rejected before auth or Foursquare API
+work.
 
 When the required SDK or runtime is unavailable, use static checks and source review first, then verify on a machine that has the matching platform toolchain.
 
@@ -85,6 +87,8 @@ When the required SDK or runtime is unavailable, use static checks and source re
   token, or user fields.
 - OAuth login uses per-request state values and HTTP-only cookies for callback
   validation.
+- Venue edit submissions are POST-only; non-POST requests receive `405 Method
+  Not Allowed`.
 
 ## Maintenance Notes
 
@@ -92,6 +96,8 @@ When the required SDK or runtime is unavailable, use static checks and source re
   OAuth, cache keys, rate limiting, or App Engine imports.
 - See `SECURITY.md` for vulnerability reporting and safe research guidance.
 - See `VISION.md` for project direction and contribution guardrails.
+- See `docs/plans/2026-06-09-fsq-propose-edit-post-only.md` for the venue edit
+  method guard.
 
 ## Contributing
 

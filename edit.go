@@ -52,6 +52,11 @@ func EditPage(w http.ResponseWriter, r *http.Request) {
 // [END Edit_Page]
 
 func ProposeEdit(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.Header().Set("Allow", http.MethodPost)
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
 
 	cookie, err := r.Cookie("fsq")
 	if err != nil {
