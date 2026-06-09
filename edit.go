@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/garethpaul/fsq-go-explore/fsq"
 )
@@ -41,7 +42,12 @@ func EditPage(w http.ResponseWriter, r *http.Request) {
 		AccessToken:  accessToken,
 	}
 
-	id := r.FormValue("id")
+	id := strings.TrimSpace(r.FormValue("id"))
+	if id == "" {
+		http.Error(w, "missing venue id", http.StatusBadRequest)
+		return
+	}
+
 	service := fsq.NewFoursquareService(c)
 	resp := service.VenueDetails(id)
 	if err := t.Execute(w, resp); err != nil {
@@ -55,6 +61,12 @@ func ProposeEdit(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		w.Header().Set("Allow", http.MethodPost)
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	id := strings.TrimSpace(r.FormValue("id"))
+	if id == "" {
+		http.Error(w, "missing venue id", http.StatusBadRequest)
 		return
 	}
 
@@ -79,7 +91,6 @@ func ProposeEdit(w http.ResponseWriter, r *http.Request) {
 		AccessToken:  accessToken,
 	}
 
-	id := r.FormValue("id")
 	if err := r.ParseForm(); err != nil {
 		log.Printf("venue edit form parse failed: %v", err)
 		http.Redirect(w, r, "/", http.StatusTemporaryRedirect)

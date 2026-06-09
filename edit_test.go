@@ -19,3 +19,16 @@ func TestProposeEditRejectsNonPostRequests(t *testing.T) {
 		t.Fatalf("Allow header = %q, want %q", got, http.MethodPost)
 	}
 }
+
+func TestProposeEditRejectsMissingVenueID(t *testing.T) {
+	for _, path := range []string{"/propose_edit", "/propose_edit?id=+++"} {
+		req := httptest.NewRequest(http.MethodPost, path, nil)
+		rr := httptest.NewRecorder()
+
+		ProposeEdit(rr, req)
+
+		if rr.Code != http.StatusBadRequest {
+			t.Fatalf("%s status = %d, want %d", path, rr.Code, http.StatusBadRequest)
+		}
+	}
+}

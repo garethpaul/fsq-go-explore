@@ -66,7 +66,7 @@ The baseline runs `go test ./...`, verifies Go formatting, checks that module
 imports are used instead of GOPATH-era local imports, and guards against
 credential- and location-adjacent logging. It also covers state-changing venue
 edit submissions so non-POST requests are rejected before auth or Foursquare API
-work.
+work, and missing venue IDs are rejected before venue API requests are built.
 
 When the required SDK or runtime is unavailable, use static checks and source review first, then verify on a machine that has the matching platform toolchain.
 
@@ -89,6 +89,8 @@ When the required SDK or runtime is unavailable, use static checks and source re
   validation.
 - Venue edit submissions are POST-only; non-POST requests receive `405 Method
   Not Allowed`.
+- Missing venue IDs are rejected with `400 Bad Request` before Foursquare venue
+  detail or edit API work.
 
 ## Maintenance Notes
 
@@ -98,6 +100,8 @@ When the required SDK or runtime is unavailable, use static checks and source re
 - See `VISION.md` for project direction and contribution guardrails.
 - See `docs/plans/2026-06-09-fsq-propose-edit-post-only.md` for the venue edit
   method guard.
+- See `docs/plans/2026-06-09-fsq-venue-id-boundary.md` for the venue ID request
+  boundary.
 
 ## Contributing
 
