@@ -41,6 +41,8 @@ Current baseline:
   work starts.
 - Auth cookies validate generated user cache keys before access-token memcache
   lookup starts.
+- Protected routes validate generated auth cookie cache keys before handler
+  work starts.
 - ETag comparisons are exact before header-cache `304 Not Modified` responses.
 - Venue edit submissions reject non-POST requests before auth or API work.
 - Venue detail and edit handlers reject missing venue IDs before auth, template,
@@ -57,6 +59,7 @@ Next priorities:
 - Keep state-changing handlers method-constrained and covered by tests
 - Keep missing OAuth authorization codes covered before exchange work is added
 - Keep user cache keys validated before memcache lookup
+- Keep protected-route auth cookie validation covered before handler work starts
 - Keep ETag matching exact when changing header-cache behavior
 - Keep missing venue IDs and malformed request boundaries covered by tests before
   auth or API side effects are introduced

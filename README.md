@@ -77,6 +77,8 @@ venue search requests are built. OAuth callbacks reject missing authorization
 codes before exchange work starts. Auth cookies must carry generated user cache
 keys before access-token memcache lookup starts. ETag comparisons are exact, so
 partial `If-None-Match` values cannot trigger cached `304` responses.
+Protected routes validate generated auth cookie cache keys before calling
+handler code.
 
 When the required SDK or runtime is unavailable, use static checks and source review first, then verify on a machine that has the matching platform toolchain.
 
@@ -100,6 +102,8 @@ When the required SDK or runtime is unavailable, use static checks and source re
 - OAuth callbacks with matching state still fail before token exchange; missing OAuth authorization codes are rejected.
 - Auth cookie values are validated as generated user cache keys before memcache
   lookup, so malformed cookie values do not reach access-token cache work.
+- Protected routes validate generated auth cookie cache keys before handler
+  work starts.
 - Venue edit submissions are POST-only; non-POST requests receive `405 Method
   Not Allowed`.
 - Missing venue IDs are rejected with `400 Bad Request` before edit-page auth,
@@ -129,6 +133,8 @@ When the required SDK or runtime is unavailable, use static checks and source re
   verification target guardrails.
 - See `docs/plans/2026-06-09-fsq-user-cache-key-boundary.md` for the auth
   cookie user cache key boundary.
+- See `docs/plans/2026-06-09-fsq-login-protect-cache-key.md` for protected
+  route auth-cookie cache-key validation.
 - See `docs/plans/2026-06-09-fsq-etag-exact-match.md` for the header cache ETag
   matching boundary.
 

@@ -67,3 +67,49 @@ func TestGetAccessTokenRejectsMalformedCacheKeysBeforeLookup(t *testing.T) {
 		}
 	}
 }
+
+func TestLoginProtectRejectsMalformedAuthCookie(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/edit", nil)
+	req.AddCookie(&http.Cookie{Name: "fsq", Value: "not-a-user-cache-key"})
+	rr := httptest.NewRecorder()
+	called := false
+
+	handler := LoginProtect(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		w.WriteHeader(http.StatusOK)
+	})
+	handler(rr, req)
+
+	if called {
+		t.Fatal("protected handler was called for malformed auth cookie")
+	}
+	if rr.Code != http.StatusTemporaryRedirect {
+		t.Fatalf("status = %d, want %d", rr.Code, http.StatusTemporaryRedirect)
+	}
+	if location := rr.Header().Get("Location"); location != "/login" {
+		t.Fatalf("redirect location = %q, want /login", location)
+	}
+}
+
+func TestLoginProtectAllowsGeneratedUserCacheKey(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/edit", nil)
+	req.AddCookie(&http.Cookie{
+		Name:  "fsq",
+		Value: fsq.GetUserKey(&fsq.FoursquareUser{ID: "user-1", Name: "Example", AccessToken: "token"}),
+	})
+	rr := httptest.NewRecorder()
+	called := false
+
+	handler := LoginProtect(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		w.WriteHeader(http.StatusNoContent)
+	})
+	handler(rr, req)
+
+	if !called {
+		t.Fatal("protected handler was not called for generated auth cache key")
+	}
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("status = %d, want %d", rr.Code, http.StatusNoContent)
+	}
+}

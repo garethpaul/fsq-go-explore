@@ -227,7 +227,7 @@ func Redirect(w http.ResponseWriter, r *http.Request) {
 func LoginProtect(fn http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		cookie, _ := r.Cookie("fsq")
-		if cookie == nil {
+		if cookie == nil || !validUserCacheKey(cookie.Value) {
 			http.Redirect(w, r, "/login", http.StatusTemporaryRedirect)
 			return
 		}

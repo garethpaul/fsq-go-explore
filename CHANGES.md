@@ -2,6 +2,8 @@
 
 ## 2026-06-09
 
+- Rejected malformed auth-cookie cache keys in the protected-route wrapper
+  before handler work starts.
 - Made header-cache ETag comparisons exact so partial `If-None-Match` values
   cannot trigger `304 Not Modified` responses.
 

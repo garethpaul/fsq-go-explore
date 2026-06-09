@@ -11,6 +11,7 @@ OAUTH_CODE_PLAN="$ROOT_DIR/docs/plans/2026-06-09-fsq-oauth-code-boundary.md"
 MAKE_GATES_PLAN="$ROOT_DIR/docs/plans/2026-06-09-fsq-go-make-gate-aliases.md"
 USER_CACHE_KEY_PLAN="$ROOT_DIR/docs/plans/2026-06-09-fsq-user-cache-key-boundary.md"
 ETAG_MATCH_PLAN="$ROOT_DIR/docs/plans/2026-06-09-fsq-etag-exact-match.md"
+LOGIN_PROTECT_KEY_PLAN="$ROOT_DIR/docs/plans/2026-06-09-fsq-login-protect-cache-key.md"
 
 require_file() {
   path=$1
@@ -45,6 +46,7 @@ for path in \
   "fsq/keys.go" \
   "fsq/keys_test.go" \
   "limiter/limiter.go" \
+  "docs/plans/2026-06-09-fsq-login-protect-cache-key.md" \
   "docs/plans/2026-06-09-fsq-etag-exact-match.md" \
   "docs/plans/2026-06-09-fsq-search-param-length.md" \
   "docs/plans/2026-06-09-fsq-edit-page-id-first.md" \
@@ -106,8 +108,10 @@ if ! grep -Fq "const userCacheKeyPrefix = \"user:\"" "$ROOT_DIR/auth.go" ||
   ! grep -Fq "func validUserCacheKey" "$ROOT_DIR/auth.go" ||
   ! grep -Fq "len(digest) != 64" "$ROOT_DIR/auth.go" ||
   ! grep -Fq "if !validUserCacheKey(key)" "$ROOT_DIR/auth.go" ||
+  ! grep -Fq "cookie == nil || !validUserCacheKey(cookie.Value)" "$ROOT_DIR/auth.go" ||
   ! grep -Fq "TestValidUserCacheKeyAcceptsGeneratedUserKeys" "$ROOT_DIR/auth_test.go" ||
-  ! grep -Fq "TestGetAccessTokenRejectsMalformedCacheKeysBeforeLookup" "$ROOT_DIR/auth_test.go"; then
+  ! grep -Fq "TestGetAccessTokenRejectsMalformedCacheKeysBeforeLookup" "$ROOT_DIR/auth_test.go" ||
+  ! grep -Fq "TestLoginProtectRejectsMalformedAuthCookie" "$ROOT_DIR/auth_test.go"; then
   printf '%s\n' "Foursquare auth cookies must validate generated user cache keys before memcache lookup." >&2
   exit 1
 fi
@@ -174,6 +178,7 @@ if ! grep -Fq "go test ./..." "$ROOT_DIR/README.md" ||
   ! grep -Fq "length-bounded" "$ROOT_DIR/README.md" ||
   ! grep -Fq "missing OAuth authorization codes are rejected" "$ROOT_DIR/README.md" ||
   ! grep -Fq "ETag comparisons are exact" "$ROOT_DIR/README.md" ||
+  ! grep -Fq "Protected routes validate generated auth cookie cache keys" "$ROOT_DIR/README.md" ||
   ! grep -Fq "user cache keys" "$ROOT_DIR/README.md" ||
   ! grep -Fq "FSQ_CLIENT_ID" "$ROOT_DIR/README.md"; then
   printf '%s\n' "README must document Go verification and Foursquare env configuration." >&2
@@ -189,6 +194,7 @@ if ! grep -Fq "scripts/check-baseline.sh" "$ROOT_DIR/VISION.md" ||
   ! grep -Fq "missing venue IDs" "$ROOT_DIR/VISION.md" ||
   ! grep -Fq "missing OAuth authorization codes" "$ROOT_DIR/VISION.md" ||
   ! grep -Fq "ETag comparisons are exact" "$ROOT_DIR/VISION.md" ||
+  ! grep -Fq "Protected routes validate generated auth cookie cache keys" "$ROOT_DIR/VISION.md" ||
   ! grep -Fq "user cache keys" "$ROOT_DIR/VISION.md" ||
   ! grep -Fq "length-bounded" "$ROOT_DIR/VISION.md" ||
   ! grep -Fq "Go module" "$ROOT_DIR/VISION.md"; then
@@ -238,6 +244,16 @@ fi
 
 if ! grep -Fq "status: completed" "$ETAG_MATCH_PLAN"; then
   printf '%s\n' "ETag exact match plan must be marked completed." >&2
+  exit 1
+fi
+
+if ! grep -Fq "status: completed" "$LOGIN_PROTECT_KEY_PLAN"; then
+  printf '%s\n' "Login protect cache key plan must be marked completed." >&2
+  exit 1
+fi
+
+if ! grep -Fq "make check" "$LOGIN_PROTECT_KEY_PLAN"; then
+  printf '%s\n' "Login protect cache key plan must record make check verification." >&2
   exit 1
 fi
 
