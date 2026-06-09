@@ -10,6 +10,7 @@
 - Returned explicit HTTP errors for search cache failure paths.
 - Restricted the venue edit submission handler to POST requests.
 - Rejected missing venue IDs before Foursquare venue detail or edit API work.
+- Rejected missing edit-page venue IDs before auth and template work.
 - Bounded search query and location parameters before Foursquare venue search
   requests are built.
 - Removed credential- and location-adjacent logging from OAuth, search, and Foursquare API flows.

@@ -13,6 +13,11 @@ import (
 
 // [START Edit_Page]
 func EditPage(w http.ResponseWriter, r *http.Request) {
+	id := strings.TrimSpace(r.FormValue("id"))
+	if id == "" {
+		http.Error(w, "missing venue id", http.StatusBadRequest)
+		return
+	}
 
 	cookie, err := r.Cookie("fsq")
 	if err != nil {
@@ -40,12 +45,6 @@ func EditPage(w http.ResponseWriter, r *http.Request) {
 		Client:       getHttpClient(r),
 		Version:      os.Getenv("FSQ_VERSION"),
 		AccessToken:  accessToken,
-	}
-
-	id := strings.TrimSpace(r.FormValue("id"))
-	if id == "" {
-		http.Error(w, "missing venue id", http.StatusBadRequest)
-		return
 	}
 
 	service := fsq.NewFoursquareService(c)

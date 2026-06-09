@@ -6,6 +6,7 @@ PLAN="$ROOT_DIR/docs/plans/2026-06-08-fsq-go-explore-go-baseline.md"
 EDIT_PLAN="$ROOT_DIR/docs/plans/2026-06-09-fsq-propose-edit-post-only.md"
 VENUE_ID_PLAN="$ROOT_DIR/docs/plans/2026-06-09-fsq-venue-id-boundary.md"
 SEARCH_PARAM_PLAN="$ROOT_DIR/docs/plans/2026-06-09-fsq-search-param-length.md"
+EDIT_ID_FIRST_PLAN="$ROOT_DIR/docs/plans/2026-06-09-fsq-edit-page-id-first.md"
 
 require_file() {
   path=$1
@@ -40,6 +41,7 @@ for path in \
   "fsq/keys_test.go" \
   "limiter/limiter.go" \
   "docs/plans/2026-06-09-fsq-search-param-length.md" \
+  "docs/plans/2026-06-09-fsq-edit-page-id-first.md" \
   "docs/plans/2026-06-09-fsq-venue-id-boundary.md" \
   "docs/plans/2026-06-09-fsq-propose-edit-post-only.md" \
   "docs/plans/2026-06-08-fsq-go-explore-go-baseline.md"; do
@@ -113,6 +115,7 @@ fi
 if ! grep -Fq 'strings.TrimSpace(r.FormValue("id"))' "$ROOT_DIR/edit.go" ||
   ! grep -Fq "missing venue id" "$ROOT_DIR/edit.go" ||
   ! grep -Fq "http.StatusBadRequest" "$ROOT_DIR/edit.go" ||
+  ! grep -Fq "TestEditPageRejectsMissingVenueIDBeforeAuth" "$ROOT_DIR/edit_test.go" ||
   ! grep -Fq "TestProposeEditRejectsMissingVenueID" "$ROOT_DIR/edit_test.go"; then
   printf '%s\n' "Venue detail/edit handlers must reject missing or blank venue IDs with test coverage." >&2
   exit 1
@@ -155,6 +158,11 @@ fi
 
 if ! grep -Fq "status: completed" "$SEARCH_PARAM_PLAN"; then
   printf '%s\n' "Search parameter length plan must be marked completed." >&2
+  exit 1
+fi
+
+if ! grep -Fq "status: completed" "$EDIT_ID_FIRST_PLAN"; then
+  printf '%s\n' "Edit-page ID-first plan must be marked completed." >&2
   exit 1
 fi
 

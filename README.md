@@ -66,9 +66,9 @@ The baseline runs `go test ./...`, verifies Go formatting, checks that module
 imports are used instead of GOPATH-era local imports, and guards against
 credential- and location-adjacent logging. It also covers state-changing venue
 edit submissions so non-POST requests are rejected before auth or Foursquare API
-work, and missing venue IDs are rejected before venue API requests are built.
-Search query and location values are trimmed and length-bounded before venue
-search requests are built.
+work, and missing venue IDs are rejected before auth, template parsing, or venue
+API requests. Search query and location values are trimmed and length-bounded
+before venue search requests are built.
 
 When the required SDK or runtime is unavailable, use static checks and source review first, then verify on a machine that has the matching platform toolchain.
 
@@ -91,8 +91,8 @@ When the required SDK or runtime is unavailable, use static checks and source re
   validation.
 - Venue edit submissions are POST-only; non-POST requests receive `405 Method
   Not Allowed`.
-- Missing venue IDs are rejected with `400 Bad Request` before Foursquare venue
-  detail or edit API work.
+- Missing venue IDs are rejected with `400 Bad Request` before edit-page auth,
+  template parsing, or Foursquare venue detail/edit API work.
 - Search query and location parameters are length-bounded before being sent to
   Foursquare or used in cache keys.
 
@@ -106,6 +106,8 @@ When the required SDK or runtime is unavailable, use static checks and source re
   method guard.
 - See `docs/plans/2026-06-09-fsq-venue-id-boundary.md` for the venue ID request
   boundary.
+- See `docs/plans/2026-06-09-fsq-edit-page-id-first.md` for the edit-page
+  malformed-request boundary.
 - See `docs/plans/2026-06-09-fsq-search-param-length.md` for search parameter
   length guardrails.
 

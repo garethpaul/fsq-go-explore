@@ -37,8 +37,8 @@ Current baseline:
 - OAuth redirects use per-login state cookies rather than a shared static state
   string.
 - Venue edit submissions reject non-POST requests before auth or API work.
-- Venue detail and edit handlers reject missing venue IDs before Foursquare API
-  work.
+- Venue detail and edit handlers reject missing venue IDs before auth, template,
+  or Foursquare API work where possible.
 - Search query and location parameters are trimmed and length-bounded before
   venue search requests.
 
@@ -47,7 +47,8 @@ Next priorities:
 - Modernize App Engine Go runtime assumptions in a dedicated pass
 - Clarify secret handling for local and hosted environments
 - Keep state-changing handlers method-constrained and covered by tests
-- Keep missing venue IDs and malformed request boundaries covered by tests
+- Keep missing venue IDs and malformed request boundaries covered by tests before
+  auth or API side effects are introduced
 - Keep search parameter bounds covered as request parsing changes
 - Separate reusable limiter concerns from demo-specific API code if needed
 
