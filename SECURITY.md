@@ -41,6 +41,7 @@ OAuth callbacks should reject missing authorization codes before token exchange
 work starts, even when the state cookie matches.
 Auth cookies should validate generated user cache keys before memcache lookup so
 malformed cookie values do not reach access-token cache work.
+ETag comparisons should stay exact before returning `304 Not Modified`.
 
 ## Dependency and Supply Chain Security
 

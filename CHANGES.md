@@ -1,5 +1,10 @@
 # Changes
 
+## 2026-06-09
+
+- Made header-cache ETag comparisons exact so partial `If-None-Match` values
+  cannot trigger `304 Not Modified` responses.
+
 ## 2026-06-08
 
 - Added `make lint`, `make test`, and `make build` aliases so local verification

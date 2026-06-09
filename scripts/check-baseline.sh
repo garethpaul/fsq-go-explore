@@ -10,6 +10,7 @@ EDIT_ID_FIRST_PLAN="$ROOT_DIR/docs/plans/2026-06-09-fsq-edit-page-id-first.md"
 OAUTH_CODE_PLAN="$ROOT_DIR/docs/plans/2026-06-09-fsq-oauth-code-boundary.md"
 MAKE_GATES_PLAN="$ROOT_DIR/docs/plans/2026-06-09-fsq-go-make-gate-aliases.md"
 USER_CACHE_KEY_PLAN="$ROOT_DIR/docs/plans/2026-06-09-fsq-user-cache-key-boundary.md"
+ETAG_MATCH_PLAN="$ROOT_DIR/docs/plans/2026-06-09-fsq-etag-exact-match.md"
 
 require_file() {
   path=$1
@@ -32,6 +33,7 @@ for path in \
   "auth.go" \
   "auth_test.go" \
   "cache.go" \
+  "cache_test.go" \
   "edit.go" \
   "edit_test.go" \
   "main.go" \
@@ -43,6 +45,7 @@ for path in \
   "fsq/keys.go" \
   "fsq/keys_test.go" \
   "limiter/limiter.go" \
+  "docs/plans/2026-06-09-fsq-etag-exact-match.md" \
   "docs/plans/2026-06-09-fsq-search-param-length.md" \
   "docs/plans/2026-06-09-fsq-edit-page-id-first.md" \
   "docs/plans/2026-06-09-fsq-go-make-gate-aliases.md" \
@@ -129,6 +132,15 @@ if ! grep -Fq "appEngineLocationFallback" "$ROOT_DIR/search.go" ||
   exit 1
 fi
 
+if grep -Fq "strings.Contains(match, key)" "$ROOT_DIR/cache.go" ||
+  ! grep -Fq "func etagMatches" "$ROOT_DIR/cache.go" ||
+  ! grep -Fq "strings.Split(headerValue" "$ROOT_DIR/cache.go" ||
+  ! grep -Fq "TestHeaderCacheRejectsPartialETagMatches" "$ROOT_DIR/cache_test.go" ||
+  ! grep -Fq "TestHeaderCacheAcceptsExactETagFromList" "$ROOT_DIR/cache_test.go"; then
+  printf '%s\n' "Header cache ETag matching must be exact and covered by tests." >&2
+  exit 1
+fi
+
 if ! grep -Fq "const maxSearchParamRunes" "$ROOT_DIR/search.go" ||
   ! grep -Fq "func normalizeSearchParam" "$ROOT_DIR/search.go" ||
   ! grep -Fq "TestSearchParamParserLimitsLongInputs" "$ROOT_DIR/search_test.go"; then
@@ -161,6 +173,7 @@ if ! grep -Fq "go test ./..." "$ROOT_DIR/README.md" ||
   ! grep -Fq "missing venue IDs are rejected" "$ROOT_DIR/README.md" ||
   ! grep -Fq "length-bounded" "$ROOT_DIR/README.md" ||
   ! grep -Fq "missing OAuth authorization codes are rejected" "$ROOT_DIR/README.md" ||
+  ! grep -Fq "ETag comparisons are exact" "$ROOT_DIR/README.md" ||
   ! grep -Fq "user cache keys" "$ROOT_DIR/README.md" ||
   ! grep -Fq "FSQ_CLIENT_ID" "$ROOT_DIR/README.md"; then
   printf '%s\n' "README must document Go verification and Foursquare env configuration." >&2
@@ -175,6 +188,7 @@ if ! grep -Fq "scripts/check-baseline.sh" "$ROOT_DIR/VISION.md" ||
   ! grep -Fq "Venue edit submissions reject non-POST requests" "$ROOT_DIR/VISION.md" ||
   ! grep -Fq "missing venue IDs" "$ROOT_DIR/VISION.md" ||
   ! grep -Fq "missing OAuth authorization codes" "$ROOT_DIR/VISION.md" ||
+  ! grep -Fq "ETag comparisons are exact" "$ROOT_DIR/VISION.md" ||
   ! grep -Fq "user cache keys" "$ROOT_DIR/VISION.md" ||
   ! grep -Fq "length-bounded" "$ROOT_DIR/VISION.md" ||
   ! grep -Fq "Go module" "$ROOT_DIR/VISION.md"; then
@@ -219,6 +233,11 @@ fi
 
 if ! grep -Fq "status: completed" "$USER_CACHE_KEY_PLAN"; then
   printf '%s\n' "User cache key boundary plan must be marked completed." >&2
+  exit 1
+fi
+
+if ! grep -Fq "status: completed" "$ETAG_MATCH_PLAN"; then
+  printf '%s\n' "ETag exact match plan must be marked completed." >&2
   exit 1
 fi
 

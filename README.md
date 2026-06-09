@@ -75,7 +75,8 @@ missing venue IDs are rejected before auth, template parsing, or venue API
 requests. Search query and location values are trimmed and length-bounded before
 venue search requests are built. OAuth callbacks reject missing authorization
 codes before exchange work starts. Auth cookies must carry generated user cache
-keys before access-token memcache lookup starts.
+keys before access-token memcache lookup starts. ETag comparisons are exact, so
+partial `If-None-Match` values cannot trigger cached `304` responses.
 
 When the required SDK or runtime is unavailable, use static checks and source review first, then verify on a machine that has the matching platform toolchain.
 
@@ -105,6 +106,7 @@ When the required SDK or runtime is unavailable, use static checks and source re
   template parsing, or Foursquare venue detail/edit API work.
 - Search query and location parameters are length-bounded before being sent to
   Foursquare or used in cache keys.
+- ETag comparisons are exact before `304 Not Modified` responses are returned.
 
 ## Maintenance Notes
 
@@ -127,6 +129,8 @@ When the required SDK or runtime is unavailable, use static checks and source re
   verification target guardrails.
 - See `docs/plans/2026-06-09-fsq-user-cache-key-boundary.md` for the auth
   cookie user cache key boundary.
+- See `docs/plans/2026-06-09-fsq-etag-exact-match.md` for the header cache ETag
+  matching boundary.
 
 ## Contributing
 

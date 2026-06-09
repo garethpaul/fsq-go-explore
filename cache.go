@@ -17,7 +17,7 @@ func HeaderCache(fn http.HandlerFunc) http.HandlerFunc {
 
 		// Header Based Caching for 2 days
 		if match := r.Header.Get("If-None-Match"); match != "" {
-			if strings.Contains(match, key) {
+			if etagMatches(match, key) {
 				w.WriteHeader(http.StatusNotModified)
 				return
 			}
@@ -29,4 +29,15 @@ func HeaderCache(fn http.HandlerFunc) http.HandlerFunc {
 
 		fn(w, r)
 	}
+}
+
+func etagMatches(headerValue, key string) bool {
+	for _, candidate := range strings.Split(headerValue, ",") {
+		candidate = strings.TrimSpace(candidate)
+		candidate = strings.Trim(candidate, `"`)
+		if candidate == key {
+			return true
+		}
+	}
+	return false
 }

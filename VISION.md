@@ -41,6 +41,7 @@ Current baseline:
   work starts.
 - Auth cookies validate generated user cache keys before access-token memcache
   lookup starts.
+- ETag comparisons are exact before header-cache `304 Not Modified` responses.
 - Venue edit submissions reject non-POST requests before auth or API work.
 - Venue detail and edit handlers reject missing venue IDs before auth, template,
   or Foursquare API work where possible.
@@ -56,6 +57,7 @@ Next priorities:
 - Keep state-changing handlers method-constrained and covered by tests
 - Keep missing OAuth authorization codes covered before exchange work is added
 - Keep user cache keys validated before memcache lookup
+- Keep ETag matching exact when changing header-cache behavior
 - Keep missing venue IDs and malformed request boundaries covered by tests before
   auth or API side effects are introduced
 - Keep search parameter bounds covered as request parsing changes
