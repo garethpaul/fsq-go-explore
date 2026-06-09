@@ -2,6 +2,8 @@
 
 ## 2026-06-08
 
+- Added `make lint`, `make test`, and `make build` aliases so local verification
+  has the expected pre-push gate targets in addition to `make check`.
 - Added a Go module and lockfile for the legacy App Engine sample.
 - Updated local and App Engine imports so `go test ./...` compiles under modules.
 - Replaced reversible cache-key construction with deterministic SHA-256 keys.

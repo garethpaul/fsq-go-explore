@@ -8,6 +8,7 @@ VENUE_ID_PLAN="$ROOT_DIR/docs/plans/2026-06-09-fsq-venue-id-boundary.md"
 SEARCH_PARAM_PLAN="$ROOT_DIR/docs/plans/2026-06-09-fsq-search-param-length.md"
 EDIT_ID_FIRST_PLAN="$ROOT_DIR/docs/plans/2026-06-09-fsq-edit-page-id-first.md"
 OAUTH_CODE_PLAN="$ROOT_DIR/docs/plans/2026-06-09-fsq-oauth-code-boundary.md"
+MAKE_GATES_PLAN="$ROOT_DIR/docs/plans/2026-06-09-fsq-go-make-gate-aliases.md"
 
 require_file() {
   path=$1
@@ -43,12 +44,20 @@ for path in \
   "limiter/limiter.go" \
   "docs/plans/2026-06-09-fsq-search-param-length.md" \
   "docs/plans/2026-06-09-fsq-edit-page-id-first.md" \
+  "docs/plans/2026-06-09-fsq-go-make-gate-aliases.md" \
   "docs/plans/2026-06-09-fsq-oauth-code-boundary.md" \
   "docs/plans/2026-06-09-fsq-venue-id-boundary.md" \
   "docs/plans/2026-06-09-fsq-propose-edit-post-only.md" \
   "docs/plans/2026-06-08-fsq-go-explore-go-baseline.md"; do
   require_file "$path"
 done
+
+makefile="$ROOT_DIR/Makefile"
+if ! grep -Eq '^\.PHONY: .*build.*check.*lint.*test|^\.PHONY: .*build.*lint.*test.*check' "$makefile" ||
+  ! grep -Fq "lint test build: check" "$makefile"; then
+  printf '%s\n' "Makefile must expose lint, test, build, and check gate targets." >&2
+  exit 1
+fi
 
 if command -v go >/dev/null 2>&1; then
   unformatted=$(find "$ROOT_DIR" -name '*.go' -not -path "$ROOT_DIR/.git/*" -print | xargs gofmt -l)
@@ -132,6 +141,9 @@ if ! grep -Fq 'strings.TrimSpace(r.FormValue("id"))' "$ROOT_DIR/edit.go" ||
 fi
 
 if ! grep -Fq "go test ./..." "$ROOT_DIR/README.md" ||
+  ! grep -Fq "make lint" "$ROOT_DIR/README.md" ||
+  ! grep -Fq "make test" "$ROOT_DIR/README.md" ||
+  ! grep -Fq "make build" "$ROOT_DIR/README.md" ||
   ! grep -Fq "make check" "$ROOT_DIR/README.md" ||
   ! grep -Fq "non-POST requests are rejected" "$ROOT_DIR/README.md" ||
   ! grep -Fq "missing venue IDs are rejected" "$ROOT_DIR/README.md" ||
@@ -143,6 +155,9 @@ if ! grep -Fq "go test ./..." "$ROOT_DIR/README.md" ||
 fi
 
 if ! grep -Fq "scripts/check-baseline.sh" "$ROOT_DIR/VISION.md" ||
+  ! grep -Fq "make lint" "$ROOT_DIR/VISION.md" ||
+  ! grep -Fq "make test" "$ROOT_DIR/VISION.md" ||
+  ! grep -Fq "make build" "$ROOT_DIR/VISION.md" ||
   ! grep -Fq "cache-key generation" "$ROOT_DIR/VISION.md" ||
   ! grep -Fq "Venue edit submissions reject non-POST requests" "$ROOT_DIR/VISION.md" ||
   ! grep -Fq "missing venue IDs" "$ROOT_DIR/VISION.md" ||
@@ -180,6 +195,11 @@ fi
 
 if ! grep -Fq "status: completed" "$OAUTH_CODE_PLAN"; then
   printf '%s\n' "OAuth code boundary plan must be marked completed." >&2
+  exit 1
+fi
+
+if ! grep -Fq "status: completed" "$MAKE_GATES_PLAN"; then
+  printf '%s\n' "Make gate alias plan must be marked completed." >&2
   exit 1
 fi
 

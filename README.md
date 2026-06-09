@@ -59,17 +59,22 @@ The setup commands above are derived from repository files. Legacy mobile, Pytho
 Run the baseline:
 
 ```bash
+make lint
+make test
+make build
 make check
 ```
 
-The baseline runs `go test ./...`, verifies Go formatting, checks that module
-imports are used instead of GOPATH-era local imports, and guards against
-credential- and location-adjacent logging. It also covers state-changing venue
-edit submissions so non-POST requests are rejected before auth or Foursquare API
-work, and missing venue IDs are rejected before auth, template parsing, or venue
-API requests. Search query and location values are trimmed and length-bounded
-before venue search requests are built. OAuth callbacks reject missing
-authorization codes before exchange work starts.
+The `lint`, `test`, and `build` targets currently delegate to the static
+baseline so formatting, tests, and static guardrails stay together. The baseline
+runs `go test ./...`, verifies Go formatting, checks that module imports are
+used instead of GOPATH-era local imports, and guards against credential- and
+location-adjacent logging. It also covers state-changing venue edit submissions
+so non-POST requests are rejected before auth or Foursquare API work, and
+missing venue IDs are rejected before auth, template parsing, or venue API
+requests. Search query and location values are trimmed and length-bounded before
+venue search requests are built. OAuth callbacks reject missing authorization
+codes before exchange work starts.
 
 When the required SDK or runtime is unavailable, use static checks and source review first, then verify on a machine that has the matching platform toolchain.
 
@@ -100,8 +105,9 @@ When the required SDK or runtime is unavailable, use static checks and source re
 
 ## Maintenance Notes
 
-- Run `make check` before pushing changes that touch Foursquare API calls,
-  OAuth, cache keys, rate limiting, or App Engine imports.
+- Run `make lint`, `make test`, `make build`, and `make check` before pushing
+  changes that touch Foursquare API calls, OAuth, cache keys, rate limiting, or
+  App Engine imports.
 - See `SECURITY.md` for vulnerability reporting and safe research guidance.
 - See `VISION.md` for project direction and contribution guardrails.
 - See `docs/plans/2026-06-09-fsq-propose-edit-post-only.md` for the venue edit
@@ -114,6 +120,8 @@ When the required SDK or runtime is unavailable, use static checks and source re
   length guardrails.
 - See `docs/plans/2026-06-09-fsq-oauth-code-boundary.md` for the OAuth callback
   authorization-code boundary.
+- See `docs/plans/2026-06-09-fsq-go-make-gate-aliases.md` for local
+  verification target guardrails.
 
 ## Contributing
 
