@@ -1,5 +1,10 @@
 # Changes
 
+## 2026-06-10
+
+- Added a pinned, least-privilege GitHub Actions workflow for the exact Go
+  toolchain, formatting, vet, tests, module integrity, and static checks.
+
 ## 2026-06-09
 
 - Rejected malformed venue edit forms before auth or Foursquare edit work.

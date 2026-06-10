@@ -53,6 +53,8 @@ Current baseline:
   venue search requests.
 - The local Makefile exposes lint, test, build, and check targets for a stable
   pre-push gate.
+- GitHub Actions installs Go from `go.mod` and runs formatting, vet, tests,
+  module-integrity checks, and the static security baseline.
 
 Next priorities:
 
@@ -70,6 +72,7 @@ Next priorities:
 - Keep search parameter bounds covered as request parsing changes
 - Keep local verification targets available as the Go/App Engine toolchain
   evolves
+- Keep the hosted GitHub Actions baseline aligned with local `make check`
 - Separate reusable limiter concerns from demo-specific API code if needed
 
 Contribution rules:

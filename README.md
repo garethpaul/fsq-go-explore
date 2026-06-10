@@ -82,6 +82,9 @@ comparisons are exact, so partial `If-None-Match` values cannot trigger cached
 Protected routes validate generated auth cookie cache keys before calling
 handler code.
 
+GitHub Actions installs the exact Go version from `go.mod` and runs formatting,
+vet, tests, module-integrity checks, and the static security baseline.
+
 When the required SDK or runtime is unavailable, use static checks and source review first, then verify on a machine that has the matching platform toolchain.
 
 ## Configuration and Secrets
@@ -143,6 +146,8 @@ When the required SDK or runtime is unavailable, use static checks and source re
   route auth-cookie cache-key validation.
 - See `docs/plans/2026-06-09-fsq-etag-exact-match.md` for the header cache ETag
   matching boundary.
+- See `docs/plans/2026-06-10-ci-baseline.md` for the GitHub Actions `make
+  check` baseline.
 
 ## Contributing
 
