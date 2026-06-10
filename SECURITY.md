@@ -49,6 +49,8 @@ malformed cookie values do not reach access-token cache work.
 Protected routes should reject malformed auth-cookie cache keys before handler
 work starts.
 ETag comparisons should stay exact before returning `304 Not Modified`.
+Rate-limiter storage should remain capped and use least-recently-used eviction
+so attacker-controlled key rotation cannot grow process memory without bound.
 
 ## Dependency and Supply Chain Security
 

@@ -14,6 +14,7 @@ ETAG_MATCH_PLAN="$ROOT_DIR/docs/plans/2026-06-09-fsq-etag-exact-match.md"
 LOGIN_PROTECT_KEY_PLAN="$ROOT_DIR/docs/plans/2026-06-09-fsq-login-protect-cache-key.md"
 EDIT_FORM_PARSE_PLAN="$ROOT_DIR/docs/plans/2026-06-09-fsq-propose-edit-form-parse-boundary.md"
 CI_PLAN="$ROOT_DIR/docs/plans/2026-06-10-ci-baseline.md"
+RATE_LIMITER_KEY_CAP_PLAN="$ROOT_DIR/docs/plans/2026-06-10-fsq-rate-limiter-key-cap.md"
 
 require_file() {
   path=$1
@@ -49,6 +50,8 @@ for path in \
   "fsq/keys.go" \
   "fsq/keys_test.go" \
   "limiter/limiter.go" \
+  "limiter/config/config_test.go" \
+  "docs/plans/2026-06-10-fsq-rate-limiter-key-cap.md" \
   "docs/plans/2026-06-09-fsq-login-protect-cache-key.md" \
   "docs/plans/2026-06-10-ci-baseline.md" \
   "docs/plans/2026-06-09-fsq-propose-edit-form-parse-boundary.md" \
@@ -181,6 +184,17 @@ if ! grep -Fq 'strings.TrimSpace(r.Form.Get("id"))' "$ROOT_DIR/edit.go" ||
   exit 1
 fi
 
+if ! grep -Fq "defaultMaxTrackedKeys = 10000" "$ROOT_DIR/limiter/config/config.go" ||
+  ! grep -Fq "list.New()" "$ROOT_DIR/limiter/config/config.go" ||
+  ! grep -Fq "MoveToFront" "$ROOT_DIR/limiter/config/config.go" ||
+  ! grep -Fq "tokenBucketOrder.Back()" "$ROOT_DIR/limiter/config/config.go" ||
+  ! grep -Fq "delete(l.tokenBuckets, oldestKey)" "$ROOT_DIR/limiter/config/config.go" ||
+  ! grep -Fq "TestLimiterCapsTrackedKeys" "$ROOT_DIR/limiter/config/config_test.go" ||
+  ! grep -Fq "TestLimiterEvictsLeastRecentlyUsedKey" "$ROOT_DIR/limiter/config/config_test.go"; then
+  printf '%s\n' "Rate limiter keys must remain capped with recency-sensitive eviction tests." >&2
+  exit 1
+fi
+
 if ! grep -Fq "go test ./..." "$ROOT_DIR/README.md" ||
   ! grep -Fq "GitHub Actions" "$ROOT_DIR/README.md" ||
   ! grep -Fq "make lint" "$ROOT_DIR/README.md" ||
@@ -194,6 +208,7 @@ if ! grep -Fq "go test ./..." "$ROOT_DIR/README.md" ||
   ! grep -Fq "missing OAuth authorization codes are rejected" "$ROOT_DIR/README.md" ||
   ! grep -Fq "ETag comparisons are exact" "$ROOT_DIR/README.md" ||
   ! grep -Fq "Protected routes validate generated auth cookie cache keys" "$ROOT_DIR/README.md" ||
+  ! grep -Fq "10,000 rate-limiter keys" "$ROOT_DIR/README.md" ||
   ! grep -Fq "user cache keys" "$ROOT_DIR/README.md" ||
   ! grep -Fq "FSQ_CLIENT_ID" "$ROOT_DIR/README.md"; then
   printf '%s\n' "README must document Go verification and Foursquare env configuration." >&2
@@ -212,6 +227,7 @@ if ! grep -Fq "scripts/check-baseline.sh" "$ROOT_DIR/VISION.md" ||
   ! grep -Fq "missing OAuth authorization codes" "$ROOT_DIR/VISION.md" ||
   ! grep -Fq "ETag comparisons are exact" "$ROOT_DIR/VISION.md" ||
   ! grep -Fq "Protected routes validate generated auth cookie cache keys" "$ROOT_DIR/VISION.md" ||
+  ! grep -Fq "10,000 tracked request keys" "$ROOT_DIR/VISION.md" ||
   ! grep -Fq "user cache keys" "$ROOT_DIR/VISION.md" ||
   ! grep -Fq "length-bounded" "$ROOT_DIR/VISION.md" ||
   ! grep -Fq "Go module" "$ROOT_DIR/VISION.md"; then
@@ -219,7 +235,8 @@ if ! grep -Fq "scripts/check-baseline.sh" "$ROOT_DIR/VISION.md" ||
   exit 1
 fi
 
-if ! grep -Fq "Malformed venue edit forms should be rejected" "$ROOT_DIR/SECURITY.md"; then
+if ! grep -Fq "Malformed venue edit forms should be rejected" "$ROOT_DIR/SECURITY.md" ||
+  ! grep -Fq "least-recently-used" "$ROOT_DIR/SECURITY.md"; then
   printf '%s\n' "SECURITY must document the malformed venue edit form boundary." >&2
   exit 1
 fi
@@ -305,6 +322,12 @@ fi
 if ! grep -Fq "status: completed" "$CI_PLAN" ||
   ! grep -Fq "make check" "$CI_PLAN"; then
   printf '%s\n' "CI baseline plan must record completed make check verification." >&2
+  exit 1
+fi
+
+if ! grep -Fq "status: completed" "$RATE_LIMITER_KEY_CAP_PLAN" ||
+  ! grep -Fq "Mutations disabling the cap or recency refresh must fail" "$RATE_LIMITER_KEY_CAP_PLAN"; then
+  printf '%s\n' "Rate limiter key-cap plan must record completed mutation verification." >&2
   exit 1
 fi
 

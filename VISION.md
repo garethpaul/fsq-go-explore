@@ -55,6 +55,8 @@ Current baseline:
   pre-push gate.
 - GitHub Actions installs Go from `go.mod` and runs formatting, vet, tests,
   module-integrity checks, and the static security baseline.
+- The in-process rate limiter retains at most 10,000 tracked request keys and
+  evicts the least recently used entry before admitting another.
 
 Next priorities:
 
@@ -65,6 +67,7 @@ Next priorities:
 - Keep user cache keys validated before memcache lookup
 - Keep protected-route auth cookie validation covered before handler work starts
 - Keep ETag matching exact when changing header-cache behavior
+- Keep rate-limiter key storage bounded when adding request key dimensions
 - Keep missing venue IDs and malformed request boundaries covered by tests before
   auth or API side effects are introduced
 - Keep malformed edit forms rejected before auth-cookie lookup and Foursquare

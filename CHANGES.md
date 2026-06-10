@@ -1,5 +1,8 @@
 # Changes
 
+- Bound the in-process rate limiter to 10,000 tracked keys with
+  least-recently-used eviction and focused capacity tests.
+
 ## 2026-06-10
 
 - Added a pinned, least-privilege GitHub Actions workflow for the exact Go
