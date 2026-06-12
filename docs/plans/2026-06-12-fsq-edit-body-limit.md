@@ -1,6 +1,6 @@
 # FSQ Venue Edit Request Body Limit
 
-status: planned
+status: completed
 
 ## Context
 
