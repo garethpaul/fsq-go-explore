@@ -391,10 +391,30 @@ if ! grep -Fq "status: completed" "$RATE_LIMITER_REFILL_PLAN" ||
   exit 1
 fi
 
-if ! grep -Fq "status: completed" "$EDIT_BODY_LIMIT_PLAN" ||
-  ! grep -Fq "A mutation that removes" "$EDIT_BODY_LIMIT_PLAN"; then
-  printf '%s\n' "Venue edit body-limit plan must record completed mutation verification." >&2
-  exit 1
-fi
+python3 - "$EDIT_BODY_LIMIT_PLAN" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+plan = Path(sys.argv[1]).read_text()
+statuses = re.findall(r"^status: .+$", plan, flags=re.MULTILINE)
+verification = plan.split("## Verification Completed\n", 1)[-1]
+required = (
+    "go test -race -count=1 ./...",
+    "push run `27392746868`",
+    "pull-request run `27392750651`",
+    "push run `27392769894`",
+    "CodeQL run `27402320766`",
+)
+
+if (
+    statuses != ["status: completed"]
+    or any(item not in verification for item in required)
+    or re.search(r"\b(?:pending|todo|tbd|not run)\b", verification, re.IGNORECASE)
+):
+    raise SystemExit(
+        "Venue edit body-limit plan must remain completed with actual verification recorded."
+    )
+PY
 
 printf '%s\n' "fsq-go-explore Go baseline checks passed."
