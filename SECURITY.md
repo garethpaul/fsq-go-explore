@@ -43,6 +43,9 @@ Search query and location parameters should stay length-bounded before they are
 sent to Foursquare or used in cache keys.
 Malformed venue edit forms should be rejected before auth-cookie lookup, token
 cache work, or Foursquare edit API calls.
+Venue edit request bodies should remain limited to 64 KiB and return `413
+Request Entity Too Large` before auth-cookie lookup, token cache work, or
+Foursquare edit API calls when exceeded.
 OAuth callbacks should reject missing authorization codes before token exchange
 work starts, even when the state cookie matches.
 Auth cookies should validate generated user cache keys before memcache lookup so

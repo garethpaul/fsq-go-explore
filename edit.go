@@ -2,6 +2,7 @@
 package app
 
 import (
+	"errors"
 	"html/template"
 	"log"
 	"net/http"
@@ -10,6 +11,8 @@ import (
 
 	"github.com/garethpaul/fsq-go-explore/fsq"
 )
+
+const maxVenueEditBodyBytes int64 = 64 << 10
 
 // [START Edit_Page]
 func EditPage(w http.ResponseWriter, r *http.Request) {
@@ -63,8 +66,14 @@ func ProposeEdit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	r.Body = http.MaxBytesReader(w, r.Body, maxVenueEditBodyBytes)
 	if err := r.ParseForm(); err != nil {
 		log.Print("venue edit form parse failed")
+		var maxBytesError *http.MaxBytesError
+		if errors.As(err, &maxBytesError) {
+			http.Error(w, "venue edit form too large", http.StatusRequestEntityTooLarge)
+			return
+		}
 		http.Error(w, "invalid venue edit form", http.StatusBadRequest)
 		return
 	}

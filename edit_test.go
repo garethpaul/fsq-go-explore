@@ -67,3 +67,38 @@ func TestProposeEditRejectsMalformedFormBeforeAuth(t *testing.T) {
 		t.Fatalf("body = %q, want invalid venue edit form", rr.Body.String())
 	}
 }
+
+func TestProposeEditAcceptsBodyAtLimitBeforeAuth(t *testing.T) {
+	body := "id=" + strings.Repeat("a", int(maxVenueEditBodyBytes)-len("id="))
+	req := httptest.NewRequest(http.MethodPost, "/propose_edit", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rr := httptest.NewRecorder()
+
+	ProposeEdit(rr, req)
+
+	if rr.Code != http.StatusTemporaryRedirect {
+		t.Fatalf("status = %d, want %d", rr.Code, http.StatusTemporaryRedirect)
+	}
+	if location := rr.Header().Get("Location"); location != "/login" {
+		t.Fatalf("redirect location = %q, want /login", location)
+	}
+}
+
+func TestProposeEditRejectsBodyOverLimitBeforeAuth(t *testing.T) {
+	body := "id=" + strings.Repeat("a", int(maxVenueEditBodyBytes)-len("id=")+1)
+	req := httptest.NewRequest(http.MethodPost, "/propose_edit", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rr := httptest.NewRecorder()
+
+	ProposeEdit(rr, req)
+
+	if rr.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("status = %d, want %d", rr.Code, http.StatusRequestEntityTooLarge)
+	}
+	if location := rr.Header().Get("Location"); location != "" {
+		t.Fatalf("redirect location = %q, want none", location)
+	}
+	if !strings.Contains(rr.Body.String(), "venue edit form too large") {
+		t.Fatalf("body = %q, want venue edit form too large", rr.Body.String())
+	}
+}

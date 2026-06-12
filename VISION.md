@@ -49,6 +49,8 @@ Current baseline:
   or Foursquare API work where possible.
 - Propose-edit rejects malformed edit forms before auth-cookie lookup or
   Foursquare edit API work.
+- Propose-edit limits request bodies to 64 KiB before form parsing, auth-cookie
+  lookup, or Foursquare edit API work.
 - Search query and location parameters are trimmed and length-bounded before
   venue search requests.
 - The local Makefile exposes lint, test, build, and check targets for a stable
@@ -76,6 +78,7 @@ Next priorities:
   auth or API side effects are introduced
 - Keep malformed edit forms rejected before auth-cookie lookup and Foursquare
   edit API calls
+- Keep venue edit request bodies bounded before parsing or auth work
 - Keep search parameter bounds covered as request parsing changes
 - Keep local verification targets available as the Go/App Engine toolchain
   evolves

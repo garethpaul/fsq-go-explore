@@ -2,6 +2,8 @@
 
 ## 2026-06-12
 
+- Limited venue edit request bodies to 64 KiB and return `413 Request Entity
+  Too Large` before auth or Foursquare work when that boundary is exceeded.
 - Corrected token-bucket refill rates so `Max` requests are restored over each
   `TTL`, while invalid non-positive configurations fail closed.
 - Added deterministic limiter tests for burst, sustained refill, and invalid

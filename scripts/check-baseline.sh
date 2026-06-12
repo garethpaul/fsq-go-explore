@@ -16,6 +16,7 @@ EDIT_FORM_PARSE_PLAN="$ROOT_DIR/docs/plans/2026-06-09-fsq-propose-edit-form-pars
 CI_PLAN="$ROOT_DIR/docs/plans/2026-06-10-ci-baseline.md"
 RATE_LIMITER_KEY_CAP_PLAN="$ROOT_DIR/docs/plans/2026-06-10-fsq-rate-limiter-key-cap.md"
 RATE_LIMITER_REFILL_PLAN="$ROOT_DIR/docs/plans/2026-06-12-fsq-rate-limiter-refill.md"
+EDIT_BODY_LIMIT_PLAN="$ROOT_DIR/docs/plans/2026-06-12-fsq-edit-body-limit.md"
 WORKFLOW="$ROOT_DIR/.github/workflows/check.yml"
 
 require_file() {
@@ -54,6 +55,7 @@ for path in \
   "limiter/limiter.go" \
   "limiter/config/config_test.go" \
   "docs/plans/2026-06-12-fsq-rate-limiter-refill.md" \
+  "docs/plans/2026-06-12-fsq-edit-body-limit.md" \
   "docs/plans/2026-06-10-fsq-rate-limiter-key-cap.md" \
   "docs/plans/2026-06-09-fsq-login-protect-cache-key.md" \
   "docs/plans/2026-06-10-ci-baseline.md" \
@@ -186,6 +188,15 @@ if ! grep -Fq 'strings.TrimSpace(r.Form.Get("id"))' "$ROOT_DIR/edit.go" ||
   ! grep -Fq "venue edit form parse failed" "$ROOT_DIR/edit.go" ||
   ! grep -Fq "TestProposeEditRejectsMalformedFormBeforeAuth" "$ROOT_DIR/edit_test.go"; then
   printf '%s\n' "Venue edit submissions must reject malformed forms before auth or Foursquare work." >&2
+  exit 1
+fi
+
+if ! grep -Fq "const maxVenueEditBodyBytes int64 = 64 << 10" "$ROOT_DIR/edit.go" ||
+  ! grep -Fq "http.MaxBytesReader(w, r.Body, maxVenueEditBodyBytes)" "$ROOT_DIR/edit.go" ||
+  ! grep -Fq "http.StatusRequestEntityTooLarge" "$ROOT_DIR/edit.go" ||
+  ! grep -Fq "TestProposeEditAcceptsBodyAtLimitBeforeAuth" "$ROOT_DIR/edit_test.go" ||
+  ! grep -Fq "TestProposeEditRejectsBodyOverLimitBeforeAuth" "$ROOT_DIR/edit_test.go"; then
+  printf '%s\n' "Venue edit bodies must remain bounded and return 413 before auth work." >&2
   exit 1
 fi
 
@@ -377,6 +388,12 @@ fi
 if ! grep -Fq "status: completed" "$RATE_LIMITER_REFILL_PLAN" ||
   ! grep -Fq "Mutations restoring one-token-per-TTL refill" "$RATE_LIMITER_REFILL_PLAN"; then
   printf '%s\n' "Rate limiter refill plan must record completed mutation verification." >&2
+  exit 1
+fi
+
+if ! grep -Fq "status: completed" "$EDIT_BODY_LIMIT_PLAN" ||
+  ! grep -Fq "A mutation that removes" "$EDIT_BODY_LIMIT_PLAN"; then
+  printf '%s\n' "Venue edit body-limit plan must record completed mutation verification." >&2
   exit 1
 fi
 

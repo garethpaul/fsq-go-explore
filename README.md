@@ -122,6 +122,8 @@ When the required SDK or runtime is unavailable, use static checks and source re
   template parsing, or Foursquare venue detail/edit API work.
 - Malformed venue edit forms are rejected with `400 Bad Request` before
   auth-cookie lookup, token cache work, or Foursquare edit API work.
+- Venue edit request bodies are limited to 64 KiB and oversized submissions
+  receive `413 Request Entity Too Large` before auth or Foursquare work.
 - Search query and location parameters are length-bounded before being sent to
   Foursquare or used in cache keys.
 - ETag comparisons are exact before `304 Not Modified` responses are returned.
@@ -159,6 +161,8 @@ When the required SDK or runtime is unavailable, use static checks and source re
   in-process rate-limiter key registry.
 - See `docs/plans/2026-06-12-fsq-rate-limiter-refill.md` for token-bucket refill
   and invalid-configuration behavior.
+- See `docs/plans/2026-06-12-fsq-edit-body-limit.md` for the venue edit request
+  body boundary.
 
 ## Contributing
 
