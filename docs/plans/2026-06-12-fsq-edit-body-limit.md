@@ -48,3 +48,19 @@ Foursquare API contract.
 - `git diff --check`
 - A mutation that removes `http.MaxBytesReader` or collapses oversized bodies
   into `400 Bad Request` must fail.
+
+## Work Completed
+
+- Applied a 64 KiB `http.MaxBytesReader` boundary before form parsing.
+- Preserved `400 Bad Request` for malformed forms and returned `413 Request
+  Entity Too Large` for capped bodies before auth or Foursquare work.
+- Added exact-limit and over-limit handler coverage.
+
+## Verification Completed
+
+- `go test -count=1 ./...`, `go test -race -count=1 ./...`, `go vet ./...`,
+  `go mod tidy -diff`, `make check`, and `git diff --check` passed locally.
+- Implementation push run `27392746868` and pull-request run `27392750651`
+  passed at commit `32194a1dbb654db1ec7f73736b73c11823ef245d`.
+- Post-merge push run `27392769894` and CodeQL run `27402320766` passed at
+  default-branch merge commit `eb6d2946edb6ebcdb15f1e0a22f7744d403fc5c8`.
