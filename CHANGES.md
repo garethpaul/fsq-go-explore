@@ -1,9 +1,19 @@
 # Changes
 
+## 2026-06-12
+
+- Corrected token-bucket refill rates so `Max` requests are restored over each
+  `TTL`, while invalid non-positive configurations fail closed.
+- Added deterministic limiter tests for burst, sustained refill, and invalid
+  configuration behavior.
+- Bound the in-process rate limiter to 10,000 tracked keys with
+  least-recently-used eviction and focused capacity tests.
+
 ## 2026-06-10
 
-- Added a GitHub Actions workflow that installs Go from `go.mod` and runs the
-  local `make check` baseline for pushes and pull requests.
+- Added a pinned, least-privilege GitHub Actions workflow for the exact Go
+  toolchain, formatting, vet, tests, module integrity, and static checks, with
+  credential-free checkout.
 
 ## 2026-06-09
 

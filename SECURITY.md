@@ -31,9 +31,10 @@ Helpful reports include:
 - Review found mobile permission or privacy-sensitive data handling; changes in those areas should receive security-focused review before merge.
 - Review found file, document, data, or media parsing flows; changes in those areas should receive security-focused review before merge.
 - Go dependency manifests are tracked in `go.mod` and `go.sum`. Keep them in sync with code changes and review App Engine, OAuth, and rate-limit dependency updates carefully.
-- GitHub Actions runs `make check` with the Go version from `go.mod`; keep that
-  hosted baseline aligned with local verification when changing auth, cache, or
-  Foursquare request code.
+- GitHub Actions runs formatting, vet, tests, module-integrity checks, and the
+  static security baseline with read-only permissions and credential-free
+  checkout; keep it aligned when changing auth, cache, or Foursquare request
+  code.
 
 ## Service and API Notes
 
@@ -49,6 +50,10 @@ malformed cookie values do not reach access-token cache work.
 Protected routes should reject malformed auth-cookie cache keys before handler
 work starts.
 ETag comparisons should stay exact before returning `304 Not Modified`.
+Rate-limiter storage should remain capped and use least-recently-used eviction
+so attacker-controlled key rotation cannot grow process memory without bound.
+Rate-limiter buckets should refill `Max` requests over `TTL`, and non-positive
+rate configurations should fail closed instead of disabling throttling.
 
 ## Dependency and Supply Chain Security
 

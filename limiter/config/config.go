@@ -1,11 +1,14 @@
 package config
 
 import (
+	"container/list"
 	"sync"
 	"time"
 
 	"golang.org/x/time/rate"
 )
+
+const defaultMaxTrackedKeys = 10000
 
 // NewLimiter is a constructor for Limiter.
 func NewLimiter(max int64, ttl time.Duration) *Limiter {
@@ -14,6 +17,9 @@ func NewLimiter(max int64, ttl time.Duration) *Limiter {
 	limiter.Message = "You have reached the maximum request limit for this tool"
 	limiter.StatusCode = 429
 	limiter.tokenBuckets = make(map[string]*rate.Limiter)
+	limiter.tokenBucketOrder = list.New()
+	limiter.tokenBucketEntries = make(map[string]*list.Element)
+	limiter.maxTrackedKeys = defaultMaxTrackedKeys
 	limiter.IPLookups = []string{"RemoteAddr", "X-Forwarded-For", "X-Real-IP"}
 
 	return limiter
@@ -55,6 +61,11 @@ type Limiter struct {
 	// Throttler struct
 	tokenBuckets map[string]*rate.Limiter
 
+	// LRU bookkeeping bounds request-controlled rate-limiter keys.
+	tokenBucketOrder   *list.List
+	tokenBucketEntries map[string]*list.Element
+	maxTrackedKeys     int
+
 	sync.RWMutex
 }
 
@@ -62,9 +73,32 @@ type Limiter struct {
 func (l *Limiter) LimitReached(key string) bool {
 	l.Lock()
 	defer l.Unlock()
-	if _, found := l.tokenBuckets[key]; !found {
-		l.tokenBuckets[key] = rate.NewLimiter(rate.Every(l.TTL), int(l.Max))
+
+	bucket, found := l.tokenBuckets[key]
+	if found {
+		l.tokenBucketOrder.MoveToFront(l.tokenBucketEntries[key])
+	} else {
+		if l.maxTrackedKeys > 0 && len(l.tokenBuckets) >= l.maxTrackedKeys {
+			oldest := l.tokenBucketOrder.Back()
+			oldestKey := oldest.Value.(string)
+			delete(l.tokenBuckets, oldestKey)
+			delete(l.tokenBucketEntries, oldestKey)
+			l.tokenBucketOrder.Remove(oldest)
+		}
+
+		bucket = newTokenBucket(l.Max, l.TTL)
+		l.tokenBuckets[key] = bucket
+		l.tokenBucketEntries[key] = l.tokenBucketOrder.PushFront(key)
 	}
 
-	return !l.tokenBuckets[key].AllowN(time.Now(), 1)
+	return !bucket.AllowN(time.Now(), 1)
+}
+
+func newTokenBucket(max int64, ttl time.Duration) *rate.Limiter {
+	if max <= 0 || ttl <= 0 {
+		return rate.NewLimiter(0, 0)
+	}
+
+	refillRate := rate.Limit(float64(max) / ttl.Seconds())
+	return rate.NewLimiter(refillRate, int(max))
 }

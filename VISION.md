@@ -53,8 +53,13 @@ Current baseline:
   venue search requests.
 - The local Makefile exposes lint, test, build, and check targets for a stable
   pre-push gate.
-- GitHub Actions runs the same `make check` baseline with the Go version from
-  `go.mod` for pushes and pull requests.
+- GitHub Actions installs Go from `go.mod` and runs formatting, vet, tests,
+  module-integrity checks, and the static security baseline with
+  credential-free checkout.
+- The in-process rate limiter retains at most 10,000 tracked request keys and
+  evicts the least recently used entry before admitting another.
+- Limiter buckets allow a burst of `Max` requests, refill `Max` requests over
+  each `TTL`, and reject requests for non-positive rate configurations.
 
 Next priorities:
 
@@ -65,6 +70,8 @@ Next priorities:
 - Keep user cache keys validated before memcache lookup
 - Keep protected-route auth cookie validation covered before handler work starts
 - Keep ETag matching exact when changing header-cache behavior
+- Keep rate-limiter key storage bounded when adding request key dimensions
+- Keep token-bucket refill semantics aligned with `Max` requests per `TTL`
 - Keep missing venue IDs and malformed request boundaries covered by tests before
   auth or API side effects are introduced
 - Keep malformed edit forms rejected before auth-cookie lookup and Foursquare

@@ -81,9 +81,16 @@ comparisons are exact, so partial `If-None-Match` values cannot trigger cached
 `304` responses.
 Protected routes validate generated auth cookie cache keys before calling
 handler code.
+The in-process limiter retains at most 10,000 rate-limiter keys and evicts the
+least recently used key when request-controlled key material reaches that cap.
+Each bucket permits a burst of `Max` requests and refills those `Max` requests
+over `TTL`; non-positive rate configurations reject requests rather than
+becoming unlimited.
 
-GitHub Actions runs the same `make check` baseline for pushes and pull
-requests using the Go version declared in `go.mod`.
+GitHub Actions installs the exact Go version from `go.mod` and runs formatting,
+vet, tests, module-integrity checks, and the static security baseline for
+pushes, pull requests, and manual dispatches. The workflow uses read-only
+permissions and credential-free checkout.
 
 When the required SDK or runtime is unavailable, use static checks and source review first, then verify on a machine that has the matching platform toolchain.
 
@@ -148,6 +155,10 @@ When the required SDK or runtime is unavailable, use static checks and source re
   matching boundary.
 - See `docs/plans/2026-06-10-ci-baseline.md` for the GitHub Actions `make
   check` baseline.
+- See `docs/plans/2026-06-10-fsq-rate-limiter-key-cap.md` for the bounded
+  in-process rate-limiter key registry.
+- See `docs/plans/2026-06-12-fsq-rate-limiter-refill.md` for token-bucket refill
+  and invalid-configuration behavior.
 
 ## Contributing
 
