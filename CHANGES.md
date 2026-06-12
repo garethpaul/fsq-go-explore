@@ -1,5 +1,9 @@
 # Changes
 
+- Corrected token-bucket refill rates so `Max` requests are restored over each
+  `TTL`, while invalid non-positive configurations fail closed.
+- Added deterministic limiter tests for burst, sustained refill, and invalid
+  configuration behavior.
 - Bound the in-process rate limiter to 10,000 tracked keys with
   least-recently-used eviction and focused capacity tests.
 

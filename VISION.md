@@ -57,6 +57,8 @@ Current baseline:
   module-integrity checks, and the static security baseline.
 - The in-process rate limiter retains at most 10,000 tracked request keys and
   evicts the least recently used entry before admitting another.
+- Limiter buckets allow a burst of `Max` requests, refill `Max` requests over
+  each `TTL`, and reject requests for non-positive rate configurations.
 
 Next priorities:
 
@@ -68,6 +70,7 @@ Next priorities:
 - Keep protected-route auth cookie validation covered before handler work starts
 - Keep ETag matching exact when changing header-cache behavior
 - Keep rate-limiter key storage bounded when adding request key dimensions
+- Keep token-bucket refill semantics aligned with `Max` requests per `TTL`
 - Keep missing venue IDs and malformed request boundaries covered by tests before
   auth or API side effects are introduced
 - Keep malformed edit forms rejected before auth-cookie lookup and Foursquare

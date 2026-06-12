@@ -51,6 +51,8 @@ work starts.
 ETag comparisons should stay exact before returning `304 Not Modified`.
 Rate-limiter storage should remain capped and use least-recently-used eviction
 so attacker-controlled key rotation cannot grow process memory without bound.
+Rate-limiter buckets should refill `Max` requests over `TTL`, and non-positive
+rate configurations should fail closed instead of disabling throttling.
 
 ## Dependency and Supply Chain Security
 

@@ -86,10 +86,19 @@ func (l *Limiter) LimitReached(key string) bool {
 			l.tokenBucketOrder.Remove(oldest)
 		}
 
-		bucket = rate.NewLimiter(rate.Every(l.TTL), int(l.Max))
+		bucket = newTokenBucket(l.Max, l.TTL)
 		l.tokenBuckets[key] = bucket
 		l.tokenBucketEntries[key] = l.tokenBucketOrder.PushFront(key)
 	}
 
 	return !bucket.AllowN(time.Now(), 1)
+}
+
+func newTokenBucket(max int64, ttl time.Duration) *rate.Limiter {
+	if max <= 0 || ttl <= 0 {
+		return rate.NewLimiter(0, 0)
+	}
+
+	refillRate := rate.Limit(float64(max) / ttl.Seconds())
+	return rate.NewLimiter(refillRate, int(max))
 }

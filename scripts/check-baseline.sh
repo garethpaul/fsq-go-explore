@@ -15,6 +15,7 @@ LOGIN_PROTECT_KEY_PLAN="$ROOT_DIR/docs/plans/2026-06-09-fsq-login-protect-cache-
 EDIT_FORM_PARSE_PLAN="$ROOT_DIR/docs/plans/2026-06-09-fsq-propose-edit-form-parse-boundary.md"
 CI_PLAN="$ROOT_DIR/docs/plans/2026-06-10-ci-baseline.md"
 RATE_LIMITER_KEY_CAP_PLAN="$ROOT_DIR/docs/plans/2026-06-10-fsq-rate-limiter-key-cap.md"
+RATE_LIMITER_REFILL_PLAN="$ROOT_DIR/docs/plans/2026-06-12-fsq-rate-limiter-refill.md"
 
 require_file() {
   path=$1
@@ -51,6 +52,7 @@ for path in \
   "fsq/keys_test.go" \
   "limiter/limiter.go" \
   "limiter/config/config_test.go" \
+  "docs/plans/2026-06-12-fsq-rate-limiter-refill.md" \
   "docs/plans/2026-06-10-fsq-rate-limiter-key-cap.md" \
   "docs/plans/2026-06-09-fsq-login-protect-cache-key.md" \
   "docs/plans/2026-06-10-ci-baseline.md" \
@@ -195,6 +197,15 @@ if ! grep -Fq "defaultMaxTrackedKeys = 10000" "$ROOT_DIR/limiter/config/config.g
   exit 1
 fi
 
+if ! grep -Fq "func newTokenBucket" "$ROOT_DIR/limiter/config/config.go" ||
+  ! grep -Fq "float64(max) / ttl.Seconds()" "$ROOT_DIR/limiter/config/config.go" ||
+  ! grep -Fq "max <= 0 || ttl <= 0" "$ROOT_DIR/limiter/config/config.go" ||
+  ! grep -Fq "TestLimiterRefillsConfiguredMaximumAcrossTTL" "$ROOT_DIR/limiter/config/config_test.go" ||
+  ! grep -Fq "TestLimiterRejectsInvalidRateConfiguration" "$ROOT_DIR/limiter/config/config_test.go"; then
+  printf '%s\n' "Rate limiter buckets must refill Max requests over TTL and reject invalid configurations." >&2
+  exit 1
+fi
+
 if ! grep -Fq "go test ./..." "$ROOT_DIR/README.md" ||
   ! grep -Fq "GitHub Actions" "$ROOT_DIR/README.md" ||
   ! grep -Fq "make lint" "$ROOT_DIR/README.md" ||
@@ -209,6 +220,7 @@ if ! grep -Fq "go test ./..." "$ROOT_DIR/README.md" ||
   ! grep -Fq "ETag comparisons are exact" "$ROOT_DIR/README.md" ||
   ! grep -Fq "Protected routes validate generated auth cookie cache keys" "$ROOT_DIR/README.md" ||
   ! grep -Fq "10,000 rate-limiter keys" "$ROOT_DIR/README.md" ||
+  ! grep -Fq 'refills those `Max` requests' "$ROOT_DIR/README.md" ||
   ! grep -Fq "user cache keys" "$ROOT_DIR/README.md" ||
   ! grep -Fq "FSQ_CLIENT_ID" "$ROOT_DIR/README.md"; then
   printf '%s\n' "README must document Go verification and Foursquare env configuration." >&2
@@ -228,6 +240,7 @@ if ! grep -Fq "scripts/check-baseline.sh" "$ROOT_DIR/VISION.md" ||
   ! grep -Fq "ETag comparisons are exact" "$ROOT_DIR/VISION.md" ||
   ! grep -Fq "Protected routes validate generated auth cookie cache keys" "$ROOT_DIR/VISION.md" ||
   ! grep -Fq "10,000 tracked request keys" "$ROOT_DIR/VISION.md" ||
+  ! grep -Fq 'refill `Max` requests' "$ROOT_DIR/VISION.md" ||
   ! grep -Fq "user cache keys" "$ROOT_DIR/VISION.md" ||
   ! grep -Fq "length-bounded" "$ROOT_DIR/VISION.md" ||
   ! grep -Fq "Go module" "$ROOT_DIR/VISION.md"; then
@@ -236,7 +249,8 @@ if ! grep -Fq "scripts/check-baseline.sh" "$ROOT_DIR/VISION.md" ||
 fi
 
 if ! grep -Fq "Malformed venue edit forms should be rejected" "$ROOT_DIR/SECURITY.md" ||
-  ! grep -Fq "least-recently-used" "$ROOT_DIR/SECURITY.md"; then
+  ! grep -Fq "least-recently-used" "$ROOT_DIR/SECURITY.md" ||
+  ! grep -Fq 'refill `Max` requests over `TTL`' "$ROOT_DIR/SECURITY.md"; then
   printf '%s\n' "SECURITY must document the malformed venue edit form boundary." >&2
   exit 1
 fi
@@ -328,6 +342,12 @@ fi
 if ! grep -Fq "status: completed" "$RATE_LIMITER_KEY_CAP_PLAN" ||
   ! grep -Fq "Mutations disabling the cap or recency refresh must fail" "$RATE_LIMITER_KEY_CAP_PLAN"; then
   printf '%s\n' "Rate limiter key-cap plan must record completed mutation verification." >&2
+  exit 1
+fi
+
+if ! grep -Fq "status: completed" "$RATE_LIMITER_REFILL_PLAN" ||
+  ! grep -Fq "Mutations restoring one-token-per-TTL refill" "$RATE_LIMITER_REFILL_PLAN"; then
+  printf '%s\n' "Rate limiter refill plan must record completed mutation verification." >&2
   exit 1
 fi
 

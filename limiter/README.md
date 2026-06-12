@@ -23,6 +23,10 @@ func main() {
 }
 ```
 
+`NewLimiter(max, ttl)` allows an initial burst of `max` requests and refills
+that allowance evenly over `ttl`. Non-positive values create a closed limiter
+that rejects requests.
+
 ## Features
 
 1. Rate-limit by request's remote IP, path, methods, custom headers, & basic auth usernames.

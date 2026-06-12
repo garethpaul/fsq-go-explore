@@ -83,6 +83,9 @@ Protected routes validate generated auth cookie cache keys before calling
 handler code.
 The in-process limiter retains at most 10,000 rate-limiter keys and evicts the
 least recently used key when request-controlled key material reaches that cap.
+Each bucket permits a burst of `Max` requests and refills those `Max` requests
+over `TTL`; non-positive rate configurations reject requests rather than
+becoming unlimited.
 
 GitHub Actions installs the exact Go version from `go.mod` and runs formatting,
 vet, tests, module-integrity checks, and the static security baseline.
@@ -152,6 +155,8 @@ When the required SDK or runtime is unavailable, use static checks and source re
   check` baseline.
 - See `docs/plans/2026-06-10-fsq-rate-limiter-key-cap.md` for the bounded
   in-process rate-limiter key registry.
+- See `docs/plans/2026-06-12-fsq-rate-limiter-refill.md` for token-bucket refill
+  and invalid-configuration behavior.
 
 ## Contributing
 
