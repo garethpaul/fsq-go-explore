@@ -88,7 +88,9 @@ over `TTL`; non-positive rate configurations reject requests rather than
 becoming unlimited.
 
 GitHub Actions installs the exact Go version from `go.mod` and runs formatting,
-vet, tests, module-integrity checks, and the static security baseline.
+vet, tests, module-integrity checks, and the static security baseline for
+pushes, pull requests, and manual dispatches. The workflow uses read-only
+permissions and credential-free checkout.
 
 When the required SDK or runtime is unavailable, use static checks and source review first, then verify on a machine that has the matching platform toolchain.
 

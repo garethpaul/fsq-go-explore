@@ -32,8 +32,9 @@ Helpful reports include:
 - Review found file, document, data, or media parsing flows; changes in those areas should receive security-focused review before merge.
 - Go dependency manifests are tracked in `go.mod` and `go.sum`. Keep them in sync with code changes and review App Engine, OAuth, and rate-limit dependency updates carefully.
 - GitHub Actions runs formatting, vet, tests, module-integrity checks, and the
-  static security baseline with read-only permissions; keep it aligned when
-  changing auth, cache, or Foursquare request code.
+  static security baseline with read-only permissions and credential-free
+  checkout; keep it aligned when changing auth, cache, or Foursquare request
+  code.
 
 ## Service and API Notes
 

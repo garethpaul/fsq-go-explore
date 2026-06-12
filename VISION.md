@@ -54,7 +54,8 @@ Current baseline:
 - The local Makefile exposes lint, test, build, and check targets for a stable
   pre-push gate.
 - GitHub Actions installs Go from `go.mod` and runs formatting, vet, tests,
-  module-integrity checks, and the static security baseline.
+  module-integrity checks, and the static security baseline with
+  credential-free checkout.
 - The in-process rate limiter retains at most 10,000 tracked request keys and
   evicts the least recently used entry before admitting another.
 - Limiter buckets allow a burst of `Max` requests, refill `Max` requests over

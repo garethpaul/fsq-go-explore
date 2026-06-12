@@ -16,6 +16,7 @@ EDIT_FORM_PARSE_PLAN="$ROOT_DIR/docs/plans/2026-06-09-fsq-propose-edit-form-pars
 CI_PLAN="$ROOT_DIR/docs/plans/2026-06-10-ci-baseline.md"
 RATE_LIMITER_KEY_CAP_PLAN="$ROOT_DIR/docs/plans/2026-06-10-fsq-rate-limiter-key-cap.md"
 RATE_LIMITER_REFILL_PLAN="$ROOT_DIR/docs/plans/2026-06-12-fsq-rate-limiter-refill.md"
+WORKFLOW="$ROOT_DIR/.github/workflows/check.yml"
 
 require_file() {
   path=$1
@@ -83,7 +84,9 @@ if command -v go >/dev/null 2>&1; then
     printf '%s\n' "$unformatted" >&2
     exit 1
   fi
+  (cd "$ROOT_DIR" && go vet ./...)
   (cd "$ROOT_DIR" && go test ./...)
+  (cd "$ROOT_DIR" && go mod tidy -diff)
 else
   printf '%s\n' "go is required for fsq-go-explore verification." >&2
   exit 1
@@ -255,18 +258,44 @@ if ! grep -Fq "Malformed venue edit forms should be rejected" "$ROOT_DIR/SECURIT
   exit 1
 fi
 
-if ! grep -Fq "workflow_dispatch:" "$ROOT_DIR/.github/workflows/check.yml" ||
-  ! grep -Fq "contents: read" "$ROOT_DIR/.github/workflows/check.yml" ||
-  ! grep -Fq "cancel-in-progress: true" "$ROOT_DIR/.github/workflows/check.yml" ||
-  ! grep -Fq "runs-on: ubuntu-24.04" "$ROOT_DIR/.github/workflows/check.yml" ||
-  ! grep -Fq "timeout-minutes: 10" "$ROOT_DIR/.github/workflows/check.yml" ||
-  ! grep -Fq "actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10" "$ROOT_DIR/.github/workflows/check.yml" ||
-  ! grep -Fq "actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c" "$ROOT_DIR/.github/workflows/check.yml" ||
-  ! grep -Fq "go-version-file: go.mod" "$ROOT_DIR/.github/workflows/check.yml" ||
-  ! grep -Fq "make check" "$ROOT_DIR/.github/workflows/check.yml"; then
-  printf '%s\n' "GitHub Actions must keep the pinned, bounded Go baseline contract." >&2
+exact_line_count() {
+  awk -v expected="$2" '$0 == expected { count += 1 } END { print count + 0 }' "$1"
+}
+
+if [ "$(exact_line_count "$WORKFLOW" 'permissions:')" -ne 1 ] || \
+  [ "$(exact_line_count "$WORKFLOW" '  contents: read')" -ne 1 ] || \
+  grep -Eq '^[[:space:]]+permissions:' "$WORKFLOW" || \
+  grep -Eq '(^|[[:space:]])write-all([[:space:]]|$)' "$WORKFLOW" || \
+  grep -Eq '^[[:space:]]+[^#][^:]*:[[:space:]]*write([[:space:]]*(#.*)?)?$' "$WORKFLOW"; then
+  printf '%s\n' "GitHub Actions must keep one top-level read-only permissions block." >&2
   exit 1
 fi
+
+if [ "$(grep -Fc 'uses: actions/checkout@' "$WORKFLOW")" -ne 1 ] || \
+  ! grep -Fq 'uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3' "$WORKFLOW" || \
+  [ "$(exact_line_count "$WORKFLOW" '          persist-credentials: false')" -ne 1 ]; then
+  printf '%s\n' "GitHub Actions must keep one pinned, credential-free checkout step." >&2
+  exit 1
+fi
+
+if [ "$(grep -Fc 'uses: actions/setup-go@' "$WORKFLOW")" -ne 1 ] || \
+  ! grep -Fq 'uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0' "$WORKFLOW" || \
+  [ "$(exact_line_count "$WORKFLOW" '          go-version-file: go.mod')" -ne 1 ] || \
+  [ "$(exact_line_count "$WORKFLOW" '        run: make check')" -ne 1 ]; then
+  printf '%s\n' "GitHub Actions must keep the pinned Go setup and canonical make check gate." >&2
+  exit 1
+fi
+
+for workflow_contract in \
+  '  workflow_dispatch:' \
+  '  cancel-in-progress: true' \
+  '    runs-on: ubuntu-24.04' \
+  '    timeout-minutes: 10'; do
+  if [ "$(exact_line_count "$WORKFLOW" "$workflow_contract")" -ne 1 ]; then
+    printf '%s\n' "GitHub Actions is missing required workflow contract: $workflow_contract" >&2
+    exit 1
+  fi
+done
 
 if ! grep -Fq "status: completed" "$PLAN"; then
   printf '%s\n' "Plan must be marked completed." >&2
