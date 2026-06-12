@@ -1,5 +1,10 @@
 # Changes
 
+## 2026-06-10
+
+- Added a GitHub Actions workflow that installs Go from `go.mod` and runs the
+  local `make check` baseline for pushes and pull requests.
+
 ## 2026-06-09
 
 - Rejected malformed venue edit forms before auth or Foursquare edit work.

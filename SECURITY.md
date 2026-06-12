@@ -31,6 +31,9 @@ Helpful reports include:
 - Review found mobile permission or privacy-sensitive data handling; changes in those areas should receive security-focused review before merge.
 - Review found file, document, data, or media parsing flows; changes in those areas should receive security-focused review before merge.
 - Go dependency manifests are tracked in `go.mod` and `go.sum`. Keep them in sync with code changes and review App Engine, OAuth, and rate-limit dependency updates carefully.
+- GitHub Actions runs `make check` with the Go version from `go.mod`; keep that
+  hosted baseline aligned with local verification when changing auth, cache, or
+  Foursquare request code.
 
 ## Service and API Notes
 

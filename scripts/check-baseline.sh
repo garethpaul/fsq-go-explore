@@ -13,6 +13,7 @@ USER_CACHE_KEY_PLAN="$ROOT_DIR/docs/plans/2026-06-09-fsq-user-cache-key-boundary
 ETAG_MATCH_PLAN="$ROOT_DIR/docs/plans/2026-06-09-fsq-etag-exact-match.md"
 LOGIN_PROTECT_KEY_PLAN="$ROOT_DIR/docs/plans/2026-06-09-fsq-login-protect-cache-key.md"
 EDIT_FORM_PARSE_PLAN="$ROOT_DIR/docs/plans/2026-06-09-fsq-propose-edit-form-parse-boundary.md"
+CI_PLAN="$ROOT_DIR/docs/plans/2026-06-10-ci-baseline.md"
 
 require_file() {
   path=$1
@@ -24,6 +25,7 @@ require_file() {
 
 for path in \
   ".gitignore" \
+  ".github/workflows/check.yml" \
   "CHANGES.md" \
   "Makefile" \
   "README.md" \
@@ -48,6 +50,7 @@ for path in \
   "fsq/keys_test.go" \
   "limiter/limiter.go" \
   "docs/plans/2026-06-09-fsq-login-protect-cache-key.md" \
+  "docs/plans/2026-06-10-ci-baseline.md" \
   "docs/plans/2026-06-09-fsq-propose-edit-form-parse-boundary.md" \
   "docs/plans/2026-06-09-fsq-etag-exact-match.md" \
   "docs/plans/2026-06-09-fsq-search-param-length.md" \
@@ -179,6 +182,7 @@ if ! grep -Fq 'strings.TrimSpace(r.Form.Get("id"))' "$ROOT_DIR/edit.go" ||
 fi
 
 if ! grep -Fq "go test ./..." "$ROOT_DIR/README.md" ||
+  ! grep -Fq "GitHub Actions" "$ROOT_DIR/README.md" ||
   ! grep -Fq "make lint" "$ROOT_DIR/README.md" ||
   ! grep -Fq "make test" "$ROOT_DIR/README.md" ||
   ! grep -Fq "make build" "$ROOT_DIR/README.md" ||
@@ -197,6 +201,7 @@ if ! grep -Fq "go test ./..." "$ROOT_DIR/README.md" ||
 fi
 
 if ! grep -Fq "scripts/check-baseline.sh" "$ROOT_DIR/VISION.md" ||
+  ! grep -Fq "GitHub Actions" "$ROOT_DIR/VISION.md" ||
   ! grep -Fq "make lint" "$ROOT_DIR/VISION.md" ||
   ! grep -Fq "make test" "$ROOT_DIR/VISION.md" ||
   ! grep -Fq "make build" "$ROOT_DIR/VISION.md" ||
@@ -216,6 +221,13 @@ fi
 
 if ! grep -Fq "Malformed venue edit forms should be rejected" "$ROOT_DIR/SECURITY.md"; then
   printf '%s\n' "SECURITY must document the malformed venue edit form boundary." >&2
+  exit 1
+fi
+
+if ! grep -Fq "actions/setup-go@v5" "$ROOT_DIR/.github/workflows/check.yml" ||
+  ! grep -Fq "go-version-file: go.mod" "$ROOT_DIR/.github/workflows/check.yml" ||
+  ! grep -Fq "make check" "$ROOT_DIR/.github/workflows/check.yml"; then
+  printf '%s\n' "GitHub Actions workflow must install Go from go.mod and run make check." >&2
   exit 1
 fi
 
@@ -281,6 +293,12 @@ fi
 
 if ! grep -Fq "make check" "$EDIT_FORM_PARSE_PLAN"; then
   printf '%s\n' "Edit form parse boundary plan must record make check verification." >&2
+  exit 1
+fi
+
+if ! grep -Fq "status: completed" "$CI_PLAN" ||
+  ! grep -Fq "make check" "$CI_PLAN"; then
+  printf '%s\n' "CI baseline plan must record completed make check verification." >&2
   exit 1
 fi
 
