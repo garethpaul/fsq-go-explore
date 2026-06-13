@@ -20,6 +20,7 @@ EDIT_BODY_LIMIT_PLAN="$ROOT_DIR/docs/plans/2026-06-12-fsq-edit-body-limit.md"
 RESPONSE_BODY_LIMIT_PLAN="$ROOT_DIR/docs/plans/2026-06-13-fsq-response-body-limit.md"
 RESPONSE_STATUS_PLAN="$ROOT_DIR/docs/plans/2026-06-13-fsq-response-status-validation.md"
 CLIENT_TIMEOUT_PLAN="$ROOT_DIR/docs/plans/2026-06-13-foursquare-client-timeout.md"
+OAUTH_USER_RESPONSE_PLAN="$ROOT_DIR/docs/plans/2026-06-13-oauth-user-response-boundary.md"
 WORKFLOW="$ROOT_DIR/.github/workflows/check.yml"
 
 require_file() {
@@ -62,6 +63,7 @@ for path in \
   "docs/plans/2026-06-13-fsq-response-body-limit.md" \
   "docs/plans/2026-06-13-fsq-response-status-validation.md" \
   "docs/plans/2026-06-13-foursquare-client-timeout.md" \
+  "docs/plans/2026-06-13-oauth-user-response-boundary.md" \
   "docs/plans/2026-06-10-fsq-rate-limiter-key-cap.md" \
   "docs/plans/2026-06-09-fsq-login-protect-cache-key.md" \
   "docs/plans/2026-06-10-ci-baseline.md" \
@@ -189,7 +191,48 @@ if ! grep -Fq 'strings.TrimSpace(r.FormValue("code"))' "$ROOT_DIR/auth.go" ||
   exit 1
 fi
 
-if ! grep -Fq "const userCacheKeyPrefix = \"user:\"" "$ROOT_DIR/auth.go" ||
+python3 - "$ROOT_DIR/auth.go" "$ROOT_DIR/auth_test.go" <<'PY'
+import sys
+from pathlib import Path
+
+source = Path(sys.argv[1]).read_text()
+tests = Path(sys.argv[2]).read_text()
+decoder = source.split("func decodeOAuthUserResponse", 1)[-1].split(
+    "\n// Process a request and cache", 1
+)[0]
+required_source = (
+    "maxOAuthUserResponseBytes = 1 * 1024 * 1024",
+    "response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices",
+    "io.ReadAll(io.LimitReader(response.Body, maxOAuthUserResponseBytes+1))",
+    "len(body) > maxOAuthUserResponseBytes",
+    "json.Unmarshal(body, wrapper)",
+    "json.Unmarshal(wrapper.Response, user)",
+)
+if any(item not in source for item in required_source):
+    raise SystemExit("OAuth user responses must keep status and 1 MiB decode boundaries.")
+status = decoder.find("response.StatusCode < http.StatusOK")
+read = decoder.find("io.ReadAll(io.LimitReader")
+if status < 0 or read < 0 or status >= read:
+    raise SystemExit("OAuth user response status validation must precede body reads.")
+
+redirect = source.split("func Redirect", 1)[-1].split("func decodeOAuthUserResponse", 1)[0]
+for item in ("defer p.Body.Close()", "user, err := decodeOAuthUserResponse(p)"):
+    if redirect.count(item) != 1:
+        raise SystemExit("OAuth callback must close and decode one user response.")
+
+required_tests = (
+    "TestDecodeOAuthUserResponseRejectsNonSuccessBeforeRead",
+    "TestDecodeOAuthUserResponseAcceptsExactLimit",
+    "TestDecodeOAuthUserResponseRejectsOversizeBody",
+    "TestDecodeOAuthUserResponsePreservesReadError",
+    "TestDecodeOAuthUserResponseRejectsMalformedPayloads",
+    "body.readCalls != 0",
+)
+if any(tests.count(item) != 1 for item in required_tests):
+    raise SystemExit("Focused OAuth user response boundary tests must remain unique.")
+PY
+
+if ! grep -Fq 'userCacheKeyPrefix        = "user:"' "$ROOT_DIR/auth.go" ||
   ! grep -Fq "func validUserCacheKey" "$ROOT_DIR/auth.go" ||
   ! grep -Fq "len(digest) != 64" "$ROOT_DIR/auth.go" ||
   ! grep -Fq "if !validUserCacheKey(key)" "$ROOT_DIR/auth.go" ||
@@ -622,5 +665,32 @@ if (
 ):
     raise SystemExit("Foursquare client timeout plan must remain completed with actual verification recorded.")
 PY
+
+python3 - "$OAUTH_USER_RESPONSE_PLAN" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+plan = Path(sys.argv[1]).read_text()
+frontmatter = plan.split("---", 2)[1]
+statuses = re.findall(r"^status: .+$", frontmatter, flags=re.MULTILINE)
+required = (
+    "seven hostile mutations were rejected",
+    "all four Make gates passed",
+    "race detector passed",
+    "No live OAuth flow",
+)
+if statuses != ["status: completed"] or any(item not in plan for item in required):
+    raise SystemExit("OAuth user response plan must record completed local verification.")
+PY
+
+if ! grep -Fq "OAuth user-profile responses require a 2xx status" "$ROOT_DIR/README.md" ||
+  ! grep -Fq "OAuth user-profile responses should reject non-2xx" "$ROOT_DIR/SECURITY.md" ||
+  ! grep -Fq "OAuth user-profile responses require 2xx status" "$ROOT_DIR/VISION.md" ||
+  ! grep -Fq "over-1-MiB OAuth user-profile responses" "$ROOT_DIR/CHANGES.md" ||
+  ! grep -Fq "Reject non-2xx OAuth user-profile responses" "$ROOT_DIR/AGENTS.md"; then
+  printf '%s\n' "Project docs must preserve OAuth user response boundaries." >&2
+  exit 1
+fi
 
 printf '%s\n' "fsq-go-explore Go baseline checks passed."

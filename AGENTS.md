@@ -47,6 +47,8 @@
 - Cache keys are deterministic SHA-256 digests and should not expose raw query, token, or user fields.
 - OAuth login uses per-request state values and HTTP-only cookies for callback validation.
 - OAuth callbacks with matching state still fail before token exchange; missing OAuth authorization codes are rejected.
+- Reject non-2xx OAuth user-profile responses before reads and cap accepted
+  profile bodies at 1 MiB before decoding.
 - Auth cookie values are validated as generated user cache keys before memcache lookup, so malformed cookie values do not reach access-token cache work.
 - Reject non-2xx Foursquare search and venue detail responses before JSON
   decoding, and keep status logs free of URLs, credentials, tokens, and bodies.

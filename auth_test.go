@@ -1,6 +1,9 @@
 package app
 
 import (
+	"errors"
+	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -8,6 +11,26 @@ import (
 
 	"github.com/garethpaul/fsq-go-explore/fsq"
 )
+
+var errOAuthProfileRead = errors.New("oauth profile read failed")
+
+type trackingReadCloser struct {
+	reader    io.Reader
+	readCalls int
+}
+
+func (r *trackingReadCloser) Read(p []byte) (int, error) {
+	r.readCalls++
+	return r.reader.Read(p)
+}
+
+func (r *trackingReadCloser) Close() error { return nil }
+
+type failingOAuthProfileReader struct{}
+
+func (failingOAuthProfileReader) Read([]byte) (int, error) {
+	return 0, errOAuthProfileRead
+}
 
 func TestNewOAuthStateReturnsDistinctOpaqueValues(t *testing.T) {
 	first, err := newOAuthState()
@@ -43,6 +66,78 @@ func TestRedirectRejectsMissingAuthorizationCodeBeforeExchange(t *testing.T) {
 	if !strings.Contains(rr.Body.String(), "missing authorization code") {
 		t.Fatalf("body = %q, want missing authorization code", rr.Body.String())
 	}
+}
+
+func TestDecodeOAuthUserResponseRejectsNonSuccessBeforeRead(t *testing.T) {
+	for _, status := range []int{http.StatusContinue, http.StatusMovedPermanently, http.StatusBadRequest, http.StatusBadGateway} {
+		body := &trackingReadCloser{reader: strings.NewReader(validOAuthUserResponse())}
+		response := &http.Response{StatusCode: status, Body: body}
+
+		_, err := decodeOAuthUserResponse(response)
+		if !errors.Is(err, errOAuthUserResponseStatus) {
+			t.Fatalf("status %d error = %v, want %v", status, err, errOAuthUserResponseStatus)
+		}
+		if body.readCalls != 0 {
+			t.Fatalf("status %d body reads = %d, want zero", status, body.readCalls)
+		}
+	}
+}
+
+func TestDecodeOAuthUserResponseAcceptsExactLimit(t *testing.T) {
+	body := validOAuthUserResponse()
+	body += strings.Repeat(" ", maxOAuthUserResponseBytes-len(body))
+
+	user, err := decodeOAuthUserResponse(&http.Response{
+		StatusCode: http.StatusOK,
+		Body:       io.NopCloser(strings.NewReader(body)),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if user.User.ID != "user-1" {
+		t.Fatalf("user ID = %q, want user-1", user.User.ID)
+	}
+}
+
+func TestDecodeOAuthUserResponseRejectsOversizeBody(t *testing.T) {
+	_, err := decodeOAuthUserResponse(&http.Response{
+		StatusCode: http.StatusOK,
+		Body:       io.NopCloser(strings.NewReader(strings.Repeat("x", maxOAuthUserResponseBytes+1))),
+	})
+	if !errors.Is(err, errOAuthUserResponseTooLarge) {
+		t.Fatalf("error = %v, want %v", err, errOAuthUserResponseTooLarge)
+	}
+}
+
+func TestDecodeOAuthUserResponsePreservesReadError(t *testing.T) {
+	_, err := decodeOAuthUserResponse(&http.Response{
+		StatusCode: http.StatusOK,
+		Body:       io.NopCloser(failingOAuthProfileReader{}),
+	})
+	if !errors.Is(err, errOAuthProfileRead) {
+		t.Fatalf("error = %v, want %v", err, errOAuthProfileRead)
+	}
+}
+
+func TestDecodeOAuthUserResponseRejectsMalformedPayloads(t *testing.T) {
+	for name, body := range map[string]string{
+		"wrapper": `{"response":`,
+		"user":    `{"response":"invalid"}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, err := decodeOAuthUserResponse(&http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(body)),
+			})
+			if err == nil {
+				t.Fatal("error = nil, want malformed JSON rejection")
+			}
+		})
+	}
+}
+
+func validOAuthUserResponse() string {
+	return fmt.Sprintf(`{"response":{"user":{"id":%q,"firstName":"Example"}}}`, "user-1")
 }
 
 func TestValidUserCacheKeyAcceptsGeneratedUserKeys(t *testing.T) {

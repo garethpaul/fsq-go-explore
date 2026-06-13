@@ -1,7 +1,7 @@
 ---
 title: OAuth User Response Boundary
 type: security
-status: planned
+status: completed
 date: 2026-06-13
 ---
 
@@ -39,3 +39,24 @@ before JSON decoding or authentication state is created.
 - Changing OAuth exchange, state cookies, cache keys, or session duration.
 - Changing the shared `fsq` API response decoder or client timeout.
 - Adding dependencies or modernizing the App Engine runtime.
+
+## Work Completed
+
+- Added a package-local OAuth user decoder that rejects non-2xx responses before
+  reads and bounds accepted bodies to 1 MiB plus one detection byte.
+- Preserved response closure and generic callback redirects while translating
+  accepted wrapper/user JSON into the existing authentication state.
+- Added focused status, exact-limit, oversize, malformed, and read-error tests.
+- Extended static contracts and maintained project guidance.
+
+## Verification Completed
+
+- The seven hostile mutations were rejected: status removal,
+  decode-before-status, unbounded read, limit drift, weakened no-read test,
+  stale plan status, and missing evidence.
+- The focused auth tests, uncached all-package tests, and race detector passed.
+- `go vet ./...`, `go mod tidy -diff`, and all four Make gates passed.
+- gofmt, shell syntax, `git diff --check`, artifact, conflict-marker, and
+  added-line secret scans are included in final verification.
+- No live OAuth flow, App Engine service, memcache access, or Foursquare request
+  was performed.
