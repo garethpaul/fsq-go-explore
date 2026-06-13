@@ -81,6 +81,9 @@ comparisons are exact, so partial `If-None-Match` values cannot trigger cached
 `304` responses.
 Protected routes validate generated auth cookie cache keys before calling
 handler code.
+Foursquare JSON response bodies are limited to 2 MiB before envelope or venue
+decoding so an unexpectedly large upstream response cannot grow process memory
+without an application boundary.
 The in-process limiter retains at most 10,000 rate-limiter keys and evicts the
 least recently used key when request-controlled key material reaches that cap.
 Each bucket permits a burst of `Max` requests and refills those `Max` requests
@@ -163,6 +166,8 @@ When the required SDK or runtime is unavailable, use static checks and source re
   and invalid-configuration behavior.
 - See `docs/plans/2026-06-12-fsq-edit-body-limit.md` for the venue edit request
   body boundary.
+- See `docs/plans/2026-06-13-fsq-response-body-limit.md` for the Foursquare JSON
+  response parse boundary.
 
 ## Contributing
 

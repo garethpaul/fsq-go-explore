@@ -4,6 +4,7 @@ package fsq
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"io"
 	"log"
 	"net/http"
@@ -14,9 +15,12 @@ import (
 
 // Setup CONSTANTS
 const (
-	SEARCH_URL = "https://api.foursquare.com/v2/venues/search?"
-	VENUE_URL  = "https://api.foursquare.com/v2/venues/"
+	SEARCH_URL                 = "https://api.foursquare.com/v2/venues/search?"
+	VENUE_URL                  = "https://api.foursquare.com/v2/venues/"
+	maxFoursquareResponseBytes = 2 * 1024 * 1024
 )
+
+var errFoursquareResponseTooLarge = errors.New("foursquare response body exceeds 2 MiB")
 
 // Struct for FourceService to wrap around requests.
 type FoursquareService struct {
@@ -141,9 +145,12 @@ func (fsqs *FoursquareConfig) clientParams() url.Values {
 }
 
 func decodeFoursquareResponse(body io.Reader, target interface{}) error {
-	data, err := io.ReadAll(body)
+	data, err := io.ReadAll(io.LimitReader(body, maxFoursquareResponseBytes+1))
 	if err != nil {
 		return err
+	}
+	if len(data) > maxFoursquareResponseBytes {
+		return errFoursquareResponseTooLarge
 	}
 	response := new(Response)
 	if err := json.Unmarshal(data, response); err != nil {

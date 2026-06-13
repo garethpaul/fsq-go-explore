@@ -1,5 +1,10 @@
 # Changes
 
+## 2026-06-13
+
+- Bounded Foursquare JSON response parsing to 2 MiB before unmarshalling and
+  added exact-limit, oversized-body, and reader-error tests.
+
 ## 2026-06-12
 
 - Limited venue edit request bodies to 64 KiB and return `413 Request Entity

@@ -17,6 +17,7 @@ CI_PLAN="$ROOT_DIR/docs/plans/2026-06-10-ci-baseline.md"
 RATE_LIMITER_KEY_CAP_PLAN="$ROOT_DIR/docs/plans/2026-06-10-fsq-rate-limiter-key-cap.md"
 RATE_LIMITER_REFILL_PLAN="$ROOT_DIR/docs/plans/2026-06-12-fsq-rate-limiter-refill.md"
 EDIT_BODY_LIMIT_PLAN="$ROOT_DIR/docs/plans/2026-06-12-fsq-edit-body-limit.md"
+RESPONSE_BODY_LIMIT_PLAN="$ROOT_DIR/docs/plans/2026-06-13-fsq-response-body-limit.md"
 WORKFLOW="$ROOT_DIR/.github/workflows/check.yml"
 
 require_file() {
@@ -56,6 +57,7 @@ for path in \
   "limiter/config/config_test.go" \
   "docs/plans/2026-06-12-fsq-rate-limiter-refill.md" \
   "docs/plans/2026-06-12-fsq-edit-body-limit.md" \
+  "docs/plans/2026-06-13-fsq-response-body-limit.md" \
   "docs/plans/2026-06-10-fsq-rate-limiter-key-cap.md" \
   "docs/plans/2026-06-09-fsq-login-protect-cache-key.md" \
   "docs/plans/2026-06-10-ci-baseline.md" \
@@ -78,6 +80,38 @@ if ! grep -Eq '^\.PHONY: .*build.*check.*lint.*test|^\.PHONY: .*build.*lint.*tes
   printf '%s\n' "Makefile must expose lint, test, build, and check gate targets." >&2
   exit 1
 fi
+
+python3 - "$ROOT_DIR/fsq/api.go" "$ROOT_DIR/fsq/api_test.go" <<'PY'
+import sys
+from pathlib import Path
+
+source = Path(sys.argv[1]).read_text()
+tests = Path(sys.argv[2]).read_text()
+source_contracts = (
+    "maxFoursquareResponseBytes = 2 * 1024 * 1024",
+    'errFoursquareResponseTooLarge = errors.New("foursquare response body exceeds 2 MiB")',
+    "io.ReadAll(io.LimitReader(body, maxFoursquareResponseBytes+1))",
+    "if len(data) > maxFoursquareResponseBytes",
+    "return errFoursquareResponseTooLarge",
+)
+test_contracts = (
+    "TestDecodeFoursquareResponseAcceptsExactLimit",
+    "TestDecodeFoursquareResponseRejectsOversizeBody",
+    "TestDecodeFoursquareResponsePreservesReadError",
+    "TestDecodeFoursquareResponseRejectsEmptyBody",
+    "TestDecodeFoursquareResponseRejectsMalformedJSON",
+    "maxFoursquareResponseBytes+1",
+    "errors.Is(err, errFoursquareResponseTooLarge)",
+    "errors.Is(err, errTestReadFailure)",
+)
+
+if any(source.count(item) != 1 for item in source_contracts):
+    raise SystemExit("Foursquare response decoding must keep one exact 2 MiB parse boundary.")
+if any(tests.count(item) != 1 for item in test_contracts):
+    raise SystemExit("Foursquare response parsing must keep exact-limit, oversize, and read-error tests.")
+if "io.ReadAll(body)" in source:
+    raise SystemExit("Foursquare response decoding must not read an unbounded body.")
+PY
 
 if command -v go >/dev/null 2>&1; then
   unformatted=$(find "$ROOT_DIR" -name '*.go' -not -path "$ROOT_DIR/.git/*" -print | xargs gofmt -l)
@@ -376,6 +410,41 @@ fi
 if ! grep -Fq "status: completed" "$CI_PLAN" ||
   ! grep -Fq "make check" "$CI_PLAN"; then
   printf '%s\n' "CI baseline plan must record completed make check verification." >&2
+  exit 1
+fi
+
+python3 - "$RESPONSE_BODY_LIMIT_PLAN" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+plan = Path(sys.argv[1]).read_text()
+frontmatter = plan.split("---", 2)[1]
+statuses = re.findall(r"^status: .+$", frontmatter, flags=re.MULTILINE)
+verification = plan.split("## Verification Completed\n", 1)[-1]
+required = (
+    "unbounded read mutation failed",
+    "limit drift mutation failed",
+    "oversize test mutation failed",
+    "hosted pull-request check",
+)
+
+if (
+    statuses != ["status: completed"]
+    or "## Verification Completed\n" not in plan
+    or any(item not in verification for item in required)
+    or re.search(r"\b(?:pending|todo|tbd|not run)\b", verification, re.IGNORECASE)
+):
+    raise SystemExit(
+        "Foursquare response body limit plan must remain completed with actual verification recorded."
+    )
+PY
+
+if ! grep -Fq "Foursquare JSON response bodies are limited to 2 MiB" "$ROOT_DIR/README.md" ||
+  ! grep -Fq "Foursquare JSON response bodies must remain limited to 2 MiB" "$ROOT_DIR/SECURITY.md" ||
+  ! grep -Fq "Foursquare JSON response parsing is limited to 2 MiB" "$ROOT_DIR/VISION.md" ||
+  ! grep -Fq "Bounded Foursquare JSON response parsing to 2 MiB" "$ROOT_DIR/CHANGES.md"; then
+  printf '%s\n' "Project guidance must document the Foursquare response parse boundary." >&2
   exit 1
 fi
 
