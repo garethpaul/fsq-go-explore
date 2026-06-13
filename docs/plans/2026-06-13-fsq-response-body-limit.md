@@ -1,7 +1,7 @@
 ---
 title: Foursquare Response Body Parse Limit
 date: 2026-06-13
-status: in_progress
+status: completed
 execution: code
 ---
 
@@ -31,7 +31,7 @@ resource-exhaustion boundary.
 
 ## Implementation
 
-- Add a package-level response-size constant and exported sentinel error in
+- Add a package-level response-size constant and private sentinel error in
   `fsq/api.go`.
 - Read through an `io.LimitReader` capped at limit plus one byte, reject an
   observed body above the limit, and only then unmarshal the Foursquare
@@ -49,3 +49,24 @@ resource-exhaustion boundary.
   hostile mutation must fail the maintained gate.
 - Take one bounded exact-head pull-request and CodeQL snapshot after push; do
   not poll.
+
+## Work Completed
+
+- Added a 2 MiB Foursquare response constant and stable package-private
+  oversized-body sentinel error.
+- Limited reads to the configured cap plus one byte and rejected oversized
+  bodies before envelope or response unmarshalling.
+- Added focused exact-limit, one-byte-over-limit, read-error, empty-body, and
+  malformed-JSON tests.
+- Added source, test, documentation, and completed-plan regression contracts.
+
+## Verification Completed
+
+- A pristine copied tree passed `make check` with completed-plan evidence
+  supplied in the copy.
+- The unbounded read mutation failed after restoring `io.ReadAll(body)`.
+- The limit drift mutation failed after changing the cap to 4 MiB.
+- The oversize test mutation failed after removing the one-byte-over-limit
+  regression test.
+- The hosted pull-request check is a post-push evidence step; its bounded
+  exact-head result is recorded after the implementation commit is pushed.

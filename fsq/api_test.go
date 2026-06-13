@@ -1,12 +1,27 @@
 package fsq
 
 import (
+	"errors"
 	"io"
 	"net/http"
 	"net/url"
 	"strings"
 	"testing"
 )
+
+type failingReader struct {
+	read bool
+}
+
+var errTestReadFailure = errors.New("read failed")
+
+func (r *failingReader) Read(p []byte) (int, error) {
+	if r.read {
+		return 0, errTestReadFailure
+	}
+	r.read = true
+	return copy(p, `{"response":`), nil
+}
 
 type roundTripFunc func(*http.Request) (*http.Response, error)
 
@@ -69,5 +84,42 @@ func TestVenueEditEscapesVenueIDAndSendsForm(t *testing.T) {
 	}
 	if gotBody != "name=New+Name" {
 		t.Fatalf("body = %q, want encoded form", gotBody)
+	}
+}
+
+func TestDecodeFoursquareResponseAcceptsExactLimit(t *testing.T) {
+	body := `{"response":{}}`
+	body += strings.Repeat(" ", maxFoursquareResponseBytes-len(body))
+
+	if err := decodeFoursquareResponse(strings.NewReader(body), &VenueSearchResponse{}); err != nil {
+		t.Fatalf("decodeFoursquareResponse exact limit: %v", err)
+	}
+}
+
+func TestDecodeFoursquareResponseRejectsOversizeBody(t *testing.T) {
+	body := strings.Repeat(" ", maxFoursquareResponseBytes+1)
+
+	err := decodeFoursquareResponse(strings.NewReader(body), &VenueSearchResponse{})
+	if !errors.Is(err, errFoursquareResponseTooLarge) {
+		t.Fatalf("decodeFoursquareResponse error = %v, want %v", err, errFoursquareResponseTooLarge)
+	}
+}
+
+func TestDecodeFoursquareResponsePreservesReadError(t *testing.T) {
+	err := decodeFoursquareResponse(&failingReader{}, &VenueSearchResponse{})
+	if !errors.Is(err, errTestReadFailure) {
+		t.Fatalf("decodeFoursquareResponse error = %v, want %v", err, errTestReadFailure)
+	}
+}
+
+func TestDecodeFoursquareResponseRejectsEmptyBody(t *testing.T) {
+	if err := decodeFoursquareResponse(strings.NewReader(""), &VenueSearchResponse{}); err == nil {
+		t.Fatal("decodeFoursquareResponse empty body error = nil, want JSON decode error")
+	}
+}
+
+func TestDecodeFoursquareResponseRejectsMalformedJSON(t *testing.T) {
+	if err := decodeFoursquareResponse(strings.NewReader(`{"response":`), &VenueSearchResponse{}); err == nil {
+		t.Fatal("decodeFoursquareResponse malformed JSON error = nil, want JSON decode error")
 	}
 }

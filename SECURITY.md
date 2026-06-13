@@ -57,6 +57,8 @@ Rate-limiter storage should remain capped and use least-recently-used eviction
 so attacker-controlled key rotation cannot grow process memory without bound.
 Rate-limiter buckets should refill `Max` requests over `TTL`, and non-positive
 rate configurations should fail closed instead of disabling throttling.
+Foursquare JSON response bodies must remain limited to 2 MiB before parsing;
+oversized or failed reads should not reach JSON unmarshalling.
 
 ## Dependency and Supply Chain Security
 

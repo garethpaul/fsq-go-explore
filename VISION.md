@@ -51,6 +51,8 @@ Current baseline:
   Foursquare edit API work.
 - Propose-edit limits request bodies to 64 KiB before form parsing, auth-cookie
   lookup, or Foursquare edit API work.
+- Foursquare JSON response parsing is limited to 2 MiB before envelope or
+  venue decoding.
 - Search query and location parameters are trimmed and length-bounded before
   venue search requests.
 - The local Makefile exposes lint, test, build, and check targets for a stable
@@ -79,6 +81,7 @@ Next priorities:
 - Keep malformed edit forms rejected before auth-cookie lookup and Foursquare
   edit API calls
 - Keep venue edit request bodies bounded before parsing or auth work
+- Keep Foursquare response bodies bounded before JSON parsing
 - Keep search parameter bounds covered as request parsing changes
 - Keep local verification targets available as the Go/App Engine toolchain
   evolves
