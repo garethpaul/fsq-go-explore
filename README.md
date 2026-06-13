@@ -65,6 +65,10 @@ make build
 make check
 ```
 
+Use the absolute Makefile path to run the same gates from another working
+directory. Verification resolves the checker relative to the loaded Makefile;
+the checker already runs repository-relative Go commands from the project root.
+
 The `lint`, `test`, and `build` targets currently delegate to the static
 baseline so formatting, tests, and static guardrails stay together. The baseline
 runs `go test ./...`, verifies Go formatting, checks that module imports are
