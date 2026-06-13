@@ -84,6 +84,8 @@ handler code.
 Foursquare JSON response bodies are limited to 2 MiB before envelope or venue
 decoding so an unexpectedly large upstream response cannot grow process memory
 without an application boundary.
+Non-2xx Foursquare search and venue detail responses are rejected before JSON decoding,
+so error envelopes cannot populate successful venue result structures.
 The in-process limiter retains at most 10,000 rate-limiter keys and evicts the
 least recently used key when request-controlled key material reaches that cap.
 Each bucket permits a burst of `Max` requests and refills those `Max` requests
@@ -168,6 +170,8 @@ When the required SDK or runtime is unavailable, use static checks and source re
   body boundary.
 - See `docs/plans/2026-06-13-fsq-response-body-limit.md` for the Foursquare JSON
   response parse boundary.
+- See `docs/plans/2026-06-13-fsq-response-status-validation.md` for upstream
+  search and venue detail status validation.
 
 ## Contributing
 

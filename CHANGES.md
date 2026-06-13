@@ -2,6 +2,9 @@
 
 ## 2026-06-13
 
+- Rejected non-2xx Foursquare search and venue detail responses before JSON decoding,
+  preventing error envelopes from populating successful result structures.
+- Added focused transport tests and method-scoped static ordering contracts.
 - Bounded Foursquare JSON response parsing to 2 MiB before unmarshalling and
   added exact-limit, oversized-body, and reader-error tests.
 
