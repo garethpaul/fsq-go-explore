@@ -59,6 +59,8 @@ Rate-limiter buckets should refill `Max` requests over `TTL`, and non-positive
 rate configurations should fail closed instead of disabling throttling.
 Foursquare JSON response bodies must remain limited to 2 MiB before parsing;
 oversized or failed reads should not reach JSON unmarshalling.
+Non-2xx Foursquare search and venue detail responses must not reach JSON decoding;
+status failures should log only the numeric status and return empty results.
 
 ## Dependency and Supply Chain Security
 

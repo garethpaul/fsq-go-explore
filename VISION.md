@@ -53,6 +53,8 @@ Current baseline:
   lookup, or Foursquare edit API work.
 - Foursquare JSON response parsing is limited to 2 MiB before envelope or
   venue decoding.
+- Non-2xx Foursquare search and venue detail responses are rejected before decoding
+  so upstream error envelopes cannot become successful venue data.
 - Search query and location parameters are trimmed and length-bounded before
   venue search requests.
 - The local Makefile exposes lint, test, build, and check targets for a stable
@@ -82,6 +84,7 @@ Next priorities:
   edit API calls
 - Keep venue edit request bodies bounded before parsing or auth work
 - Keep Foursquare response bodies bounded before JSON parsing
+- Keep non-2xx Foursquare search and venue detail responses out of JSON decoding
 - Keep search parameter bounds covered as request parsing changes
 - Keep local verification targets available as the Go/App Engine toolchain
   evolves

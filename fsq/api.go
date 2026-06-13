@@ -22,6 +22,10 @@ const (
 
 var errFoursquareResponseTooLarge = errors.New("foursquare response body exceeds 2 MiB")
 
+func successfulFoursquareStatus(statusCode int) bool {
+	return statusCode >= http.StatusOK && statusCode < http.StatusMultipleChoices
+}
+
 // Struct for FourceService to wrap around requests.
 type FoursquareService struct {
 	Config *FoursquareConfig
@@ -63,8 +67,9 @@ func (fsqs *FoursquareService) Search(vsr *VenueSearchRequest) (resp *VenueSearc
 	}
 	defer r.Body.Close()
 
-	if r.StatusCode >= http.StatusBadRequest {
+	if !successfulFoursquareStatus(r.StatusCode) {
 		log.Printf("foursquare search request returned status=%d", r.StatusCode)
+		return venues
 	}
 	if err := decodeFoursquareResponse(r.Body, venues); err != nil {
 		log.Printf("foursquare search response decode failed: %v", err)
@@ -90,8 +95,9 @@ func (fsqs *FoursquareService) VenueDetails(id string) (resp *VenueResponse) {
 	}
 	defer r.Body.Close()
 
-	if r.StatusCode >= http.StatusBadRequest {
+	if !successfulFoursquareStatus(r.StatusCode) {
 		log.Printf("foursquare venue details request returned status=%d", r.StatusCode)
+		return venue
 	}
 	if err := decodeFoursquareResponse(r.Body, venue); err != nil {
 		log.Printf("foursquare venue details response decode failed: %v", err)

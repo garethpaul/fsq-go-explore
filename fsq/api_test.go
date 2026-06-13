@@ -30,10 +30,71 @@ func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
 }
 
 func testResponse(body string) *http.Response {
+	return testResponseWithStatus(http.StatusOK, body)
+}
+
+func testResponseWithStatus(status int, body string) *http.Response {
 	return &http.Response{
-		StatusCode: http.StatusOK,
+		StatusCode: status,
 		Body:       io.NopCloser(strings.NewReader(body)),
 		Header:     make(http.Header),
+	}
+}
+
+func TestSuccessfulFoursquareStatusAcceptsOnly2xx(t *testing.T) {
+	tests := []struct {
+		status int
+		want   bool
+	}{
+		{status: http.StatusContinue, want: false},
+		{status: http.StatusOK, want: true},
+		{status: 299, want: true},
+		{status: http.StatusMultipleChoices, want: false},
+	}
+
+	for _, tt := range tests {
+		if got := successfulFoursquareStatus(tt.status); got != tt.want {
+			t.Errorf("successfulFoursquareStatus(%d) = %t, want %t", tt.status, got, tt.want)
+		}
+	}
+}
+
+func TestSearchRejectsNonSuccessResponseBeforeDecode(t *testing.T) {
+	service := NewFoursquareService(&FoursquareConfig{
+		ClientId:     "client-id",
+		ClientSecret: "client-secret",
+		Version:      "20260613",
+		Client: http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+			return testResponseWithStatus(
+				http.StatusInternalServerError,
+				`{"response":{"venues":[{"id":"must-not-decode"}]}}`,
+			), nil
+		})},
+	})
+
+	response := service.Search(&VenueSearchRequest{Near: "San Francisco", Query: "coffee"})
+
+	if len(response.Venues) != 0 {
+		t.Fatalf("Search venues = %#v, want empty result for non-2xx response", response.Venues)
+	}
+}
+
+func TestVenueDetailsRejectsNonSuccessResponseBeforeDecode(t *testing.T) {
+	service := NewFoursquareService(&FoursquareConfig{
+		AccessToken: "token",
+		Version:     "20260613",
+		Client: http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+			return testResponseWithStatus(
+				http.StatusBadGateway,
+				`{"response":{"venue":{"id":"must-not-decode"}}}`,
+			), nil
+		})},
+	})
+
+	response := service.VenueDetails("venue-1")
+
+	if response.Venue.ID != "" {
+		t.Fatalf("VenueDetails venue ID = %q, want empty result for non-2xx response", response.Venue.ID)
 	}
 }
 

@@ -18,6 +18,7 @@ RATE_LIMITER_KEY_CAP_PLAN="$ROOT_DIR/docs/plans/2026-06-10-fsq-rate-limiter-key-
 RATE_LIMITER_REFILL_PLAN="$ROOT_DIR/docs/plans/2026-06-12-fsq-rate-limiter-refill.md"
 EDIT_BODY_LIMIT_PLAN="$ROOT_DIR/docs/plans/2026-06-12-fsq-edit-body-limit.md"
 RESPONSE_BODY_LIMIT_PLAN="$ROOT_DIR/docs/plans/2026-06-13-fsq-response-body-limit.md"
+RESPONSE_STATUS_PLAN="$ROOT_DIR/docs/plans/2026-06-13-fsq-response-status-validation.md"
 WORKFLOW="$ROOT_DIR/.github/workflows/check.yml"
 
 require_file() {
@@ -171,6 +172,45 @@ if grep -Eq 'VENUE_URL \+ (id|venueId)' "$ROOT_DIR/fsq/api.go" ||
   printf '%s\n' "Venue IDs must be path-escaped before Foursquare request URLs are built." >&2
   exit 1
 fi
+
+python3 - "$ROOT_DIR/fsq/api.go" "$ROOT_DIR/fsq/api_test.go" <<'PY'
+import sys
+from pathlib import Path
+
+source = Path(sys.argv[1]).read_text()
+tests = Path(sys.argv[2]).read_text()
+search = source.split("func (fsqs *FoursquareService) Search", 1)[-1].split(
+    "\n// Details gets", 1
+)[0]
+details = source.split("func (fsqs *FoursquareService) VenueDetails", 1)[-1].split(
+    "\n// ProposeEdit", 1
+)[0]
+guard = "if !successfulFoursquareStatus(r.StatusCode)"
+decoder = "decodeFoursquareResponse(r.Body"
+
+if source.count("func successfulFoursquareStatus(statusCode int) bool") != 1:
+    raise SystemExit("Foursquare response status validation must use one shared success predicate.")
+if "statusCode >= http.StatusOK && statusCode < http.StatusMultipleChoices" not in source:
+    raise SystemExit("Foursquare success status validation must remain restricted to 2xx responses.")
+for name, method in (("search", search), ("venue details", details)):
+    if method.count(guard) != 1 or method.count(decoder) != 1:
+        raise SystemExit(f"Foursquare {name} must retain one status guard and one bounded decoder call.")
+    if method.index(guard) > method.index(decoder):
+        raise SystemExit(f"Foursquare {name} status validation must run before response decoding.")
+
+required_tests = (
+    "TestSuccessfulFoursquareStatusAcceptsOnly2xx",
+    "TestSearchRejectsNonSuccessResponseBeforeDecode",
+    "TestVenueDetailsRejectsNonSuccessResponseBeforeDecode",
+    "http.StatusContinue",
+    "http.StatusMultipleChoices",
+    "http.StatusInternalServerError",
+    "http.StatusBadGateway",
+    '"must-not-decode"',
+)
+if any(tests.count(item) < 1 for item in required_tests):
+    raise SystemExit("Non-2xx Foursquare search and detail behavior must retain focused transport tests.")
+PY
 
 if ! grep -Fq "sha256.Sum256" "$ROOT_DIR/fsq/keys.go" ||
   ! grep -Fq 'cacheKey("search"' "$ROOT_DIR/fsq/keys.go" ||
@@ -440,11 +480,46 @@ if (
     )
 PY
 
+python3 - "$RESPONSE_STATUS_PLAN" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+plan = Path(sys.argv[1]).read_text()
+frontmatter = plan.split("---", 2)[1]
+statuses = re.findall(r"^status: .+$", frontmatter, flags=re.MULTILINE)
+verification = plan.split("## Verification Completed\n", 1)[-1]
+required = (
+    "status guard mutation failed",
+    "decode ordering mutation failed",
+    "non-2xx test mutation failed",
+    "hosted pull-request check",
+)
+
+if (
+    statuses != ["status: completed"]
+    or "## Verification Completed\n" not in plan
+    or any(item not in verification for item in required)
+    or re.search(r"\b(?:pending|todo|tbd|not run)\b", verification, re.IGNORECASE)
+):
+    raise SystemExit(
+        "Foursquare response status plan must remain completed with actual verification recorded."
+    )
+PY
+
 if ! grep -Fq "Foursquare JSON response bodies are limited to 2 MiB" "$ROOT_DIR/README.md" ||
   ! grep -Fq "Foursquare JSON response bodies must remain limited to 2 MiB" "$ROOT_DIR/SECURITY.md" ||
   ! grep -Fq "Foursquare JSON response parsing is limited to 2 MiB" "$ROOT_DIR/VISION.md" ||
   ! grep -Fq "Bounded Foursquare JSON response parsing to 2 MiB" "$ROOT_DIR/CHANGES.md"; then
   printf '%s\n' "Project guidance must document the Foursquare response parse boundary." >&2
+  exit 1
+fi
+
+if ! grep -Fq "Non-2xx Foursquare search and venue detail responses are rejected before JSON decoding" "$ROOT_DIR/README.md" ||
+  ! grep -Fq "Non-2xx Foursquare search and venue detail responses must not reach JSON decoding" "$ROOT_DIR/SECURITY.md" ||
+  ! grep -Fq "Non-2xx Foursquare search and venue detail responses are rejected before decoding" "$ROOT_DIR/VISION.md" ||
+  ! grep -Fq "Rejected non-2xx Foursquare search and venue detail responses before JSON decoding" "$ROOT_DIR/CHANGES.md"; then
+  printf '%s\n' "Project guidance must document the Foursquare response status boundary." >&2
   exit 1
 fi
 

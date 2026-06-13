@@ -1,7 +1,7 @@
 ---
 title: Foursquare Response Status Validation
 type: security
-status: planned
+status: completed
 date: 2026-06-13
 ---
 
@@ -95,8 +95,32 @@ Files: `README.md`, `SECURITY.md`, `VISION.md`, `CHANGES.md`, `AGENTS.md`
 
 ## Work Completed
 
-Pending implementation.
+- Added one shared `successfulFoursquareStatus` predicate for the exact 2xx
+  range.
+- Returned the existing empty search or venue detail result before bounded JSON
+  decoding when Foursquare returns a non-2xx status.
+- Preserved response-body closure, numeric-only status logging, the 2 MiB
+  decoder, request parameters, public method signatures, and escaped venue IDs.
+- Added direct transport tests with valid-looking error envelopes and a
+  199/200/299/300 predicate boundary test plus a method-scoped static
+  guard/decoder ordering contract.
+- Updated repository guidance and completed-plan enforcement for the status
+  boundary.
 
 ## Verification Completed
 
-Pending implementation and verification.
+- The status guard mutation failed after bypassing the search status predicate;
+  the crafted 500 response populated a venue and failed the focused test.
+- The decode ordering mutation failed after moving venue detail decoding ahead
+  of status validation; the crafted 502 response populated a venue ID.
+- The non-2xx test mutation failed after changing the crafted search response to
+  HTTP 200; the test detected that its error-path premise had been weakened.
+- Focused `fsq` tests and uncached all-package tests passed on Go 1.25.3.
+- All packages passed with the race detector; `go vet ./...` and
+  `go mod tidy -diff` passed.
+- `make check`, `make lint`, `make test`, and `make build` passed.
+- gofmt, shell syntax, `git diff --check`, and intended-path artifact and secret
+  scans passed.
+- The hosted pull-request check and code-scanning results are recorded against
+  the exact pushed head in the external engineering tracker. Embedding that SHA
+  here would create a new head without exact-head hosted evidence.
