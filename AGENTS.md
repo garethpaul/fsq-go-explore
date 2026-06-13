@@ -50,6 +50,8 @@
 - Auth cookie values are validated as generated user cache keys before memcache lookup, so malformed cookie values do not reach access-token cache work.
 - Reject non-2xx Foursquare search and venue detail responses before JSON
   decoding, and keep status logs free of URLs, credentials, tokens, and bodies.
+- Keep the 10-second default Foursquare client timeout conditional, preserve
+  explicit positive timeouts, and do not mutate caller-owned configuration.
 
 ## Agent workflow
 

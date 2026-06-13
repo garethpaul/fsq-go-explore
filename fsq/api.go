@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"time"
 
 	"golang.org/x/oauth2"
 )
@@ -18,6 +19,7 @@ const (
 	SEARCH_URL                 = "https://api.foursquare.com/v2/venues/search?"
 	VENUE_URL                  = "https://api.foursquare.com/v2/venues/"
 	maxFoursquareResponseBytes = 2 * 1024 * 1024
+	foursquareRequestTimeout   = 10 * time.Second
 )
 
 var errFoursquareResponseTooLarge = errors.New("foursquare response body exceeds 2 MiB")
@@ -43,8 +45,13 @@ type FoursquareConfig struct {
 
 // Create a new fource service with a given config file.
 func NewFoursquareService(config *FoursquareConfig) *FoursquareService {
-	svc := &FoursquareService{Config: config}
-	return svc
+	serviceConfig := *config
+	client := config.Client
+	if client.Timeout <= 0 {
+		client.Timeout = foursquareRequestTimeout
+	}
+	serviceConfig.Client = client
+	return &FoursquareService{Config: &serviceConfig}
 }
 
 // See https://developer.foursquare.com/docs/venues/search

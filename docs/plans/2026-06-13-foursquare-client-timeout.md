@@ -1,7 +1,7 @@
 ---
 title: Foursquare Client Timeout
 type: reliability
-status: planned
+status: completed
 date: 2026-06-13
 ---
 
@@ -84,8 +84,29 @@ Files: `README.md`, `SECURITY.md`, `VISION.md`, `CHANGES.md`, `AGENTS.md`
 
 ## Work Completed
 
-Pending implementation.
+- Added a 10-second default end-to-end timeout for Foursquare clients with
+  non-positive timeout values.
+- Cloned the supplied config and client values so service construction preserves
+  explicit positive timeouts without mutating caller-owned configuration.
+- Added focused constructor tests and static contracts for value, conditional
+  defaulting, ownership, documentation, and completed evidence.
 
 ## Verification Completed
 
-Pending implementation and verification.
+- All three focused constructor tests passed.
+- Uncached fsq-package and all-package tests passed.
+- The timeout removal mutation failed the exact constructor contract.
+- The timeout drift mutation failed after changing the default to 30 seconds.
+- The unconditional override mutation failed after replacing the condition with
+  valid unconditional logic.
+- The caller mutation mutation failed after assigning through the caller config.
+- The focused test mutation failed after removing the immutability regression.
+- The plan evidence mutation failed the completed-evidence contract.
+- `go test -race -count=1 ./...`, `go vet ./...`, `go mod tidy -diff`, and
+  `make check`, `make lint`, `make test`, and `make build` passed.
+- gofmt, shell syntax, `git diff --check`, and intended-file secret and artifact
+  scans are included in final-tree verification.
+- No real Foursquare request, OAuth flow, App Engine deployment, or production
+  response was exercised.
+- The hosted pull-request check and code-scanning snapshot will be recorded
+  against the exact pushed head in the external engineering tracker.

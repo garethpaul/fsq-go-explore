@@ -86,6 +86,8 @@ decoding so an unexpectedly large upstream response cannot grow process memory
 without an application boundary.
 Non-2xx Foursquare search and venue detail responses are rejected before JSON decoding,
 so error envelopes cannot populate successful venue result structures.
+Foursquare HTTP clients receive a 10-second default end-to-end timeout when
+callers do not provide a positive timeout; explicit positive values are kept.
 The in-process limiter retains at most 10,000 rate-limiter keys and evicts the
 least recently used key when request-controlled key material reaches that cap.
 Each bucket permits a burst of `Max` requests and refills those `Max` requests
@@ -172,6 +174,8 @@ When the required SDK or runtime is unavailable, use static checks and source re
   response parse boundary.
 - See `docs/plans/2026-06-13-fsq-response-status-validation.md` for upstream
   search and venue detail status validation.
+- See `docs/plans/2026-06-13-foursquare-client-timeout.md` for the default
+  end-to-end request timeout and caller-ownership boundary.
 
 ## Contributing
 

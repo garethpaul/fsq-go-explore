@@ -55,6 +55,8 @@ Current baseline:
   venue decoding.
 - Non-2xx Foursquare search and venue detail responses are rejected before decoding
   so upstream error envelopes cannot become successful venue data.
+- Foursquare HTTP clients default to a 10-second end-to-end timeout while
+  preserving explicit positive caller values and caller configuration ownership.
 - Search query and location parameters are trimmed and length-bounded before
   venue search requests.
 - The local Makefile exposes lint, test, build, and check targets for a stable
@@ -85,6 +87,7 @@ Next priorities:
 - Keep venue edit request bodies bounded before parsing or auth work
 - Keep Foursquare response bodies bounded before JSON parsing
 - Keep non-2xx Foursquare search and venue detail responses out of JSON decoding
+- Keep the default Foursquare client timeout and caller immutability covered
 - Keep search parameter bounds covered as request parsing changes
 - Keep local verification targets available as the Go/App Engine toolchain
   evolves
