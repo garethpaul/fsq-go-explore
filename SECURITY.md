@@ -48,6 +48,8 @@ Request Entity Too Large` before auth-cookie lookup, token cache work, or
 Foursquare edit API calls when exceeded.
 OAuth callbacks should reject missing authorization codes before token exchange
 work starts, even when the state cookie matches.
+OAuth user-profile responses should reject non-2xx statuses before body reads
+and enforce a 1 MiB limit before JSON decoding or session creation.
 Auth cookies should validate generated user cache keys before memcache lookup so
 malformed cookie values do not reach access-token cache work.
 Protected routes should reject malformed auth-cookie cache keys before handler

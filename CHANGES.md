@@ -2,6 +2,8 @@
 
 ## 2026-06-13
 
+- Rejected non-2xx and over-1-MiB OAuth user-profile responses before session
+  state is created.
 - Added a 10-second default Foursquare HTTP client timeout while preserving
   explicit positive caller values and caller configuration ownership.
 - Added focused constructor tests and mutation-sensitive timeout contracts.

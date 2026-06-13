@@ -39,6 +39,8 @@ Current baseline:
   string.
 - OAuth callbacks reject missing OAuth authorization codes before token exchange
   work starts.
+- OAuth user-profile responses require 2xx status and a 1 MiB body boundary
+  before wrapper or user decoding.
 - Auth cookies validate generated user cache keys before access-token memcache
   lookup starts.
 - Protected routes validate generated auth cookie cache keys before handler

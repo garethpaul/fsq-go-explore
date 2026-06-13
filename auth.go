@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"io"
 	"log"
 	"net/http"
@@ -38,7 +39,15 @@ var (
 	oauthStateCookieName = "fsq_oauth_state"
 )
 
-const userCacheKeyPrefix = "user:"
+const (
+	userCacheKeyPrefix        = "user:"
+	maxOAuthUserResponseBytes = 1 * 1024 * 1024
+)
+
+var (
+	errOAuthUserResponseStatus   = errors.New("foursquare user response status was not successful")
+	errOAuthUserResponseTooLarge = errors.New("foursquare user response exceeded the size limit")
+)
 
 func newOAuthState() (string, error) {
 	bytes := make([]byte, 32)
@@ -181,22 +190,9 @@ func Redirect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer p.Body.Close()
-	d, err := io.ReadAll(p.Body)
+	user, err := decodeOAuthUserResponse(p)
 	if err != nil {
-		log.Print("foursquare user response read failed")
-		http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
-		return
-	}
-
-	user := new(fsq.UserResponse)
-	response := new(fsq.Response)
-	if err := json.Unmarshal(d, response); err != nil {
-		log.Print("foursquare user wrapper decode failed")
-		http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
-		return
-	}
-	if err := json.Unmarshal(response.Response, user); err != nil {
-		log.Print("foursquare user decode failed")
+		log.Print("foursquare user response rejected")
 		http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
 		return
 	}
@@ -221,6 +217,33 @@ func Redirect(w http.ResponseWriter, r *http.Request) {
 	}
 	http.SetCookie(w, &cookie)
 	http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
+}
+
+func decodeOAuthUserResponse(response *http.Response) (*fsq.UserResponse, error) {
+	if response == nil || response.Body == nil {
+		return nil, errors.New("foursquare user response was missing")
+	}
+	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
+		return nil, errOAuthUserResponseStatus
+	}
+
+	body, err := io.ReadAll(io.LimitReader(response.Body, maxOAuthUserResponseBytes+1))
+	if err != nil {
+		return nil, err
+	}
+	if len(body) > maxOAuthUserResponseBytes {
+		return nil, errOAuthUserResponseTooLarge
+	}
+
+	wrapper := new(fsq.Response)
+	if err := json.Unmarshal(body, wrapper); err != nil {
+		return nil, err
+	}
+	user := new(fsq.UserResponse)
+	if err := json.Unmarshal(wrapper.Response, user); err != nil {
+		return nil, err
+	}
+	return user, nil
 }
 
 // Process a request and cache using headers.
