@@ -2,6 +2,8 @@
 
 ## 2026-06-13
 
+- Made Go verification independent of the caller's working directory by
+  resolving the baseline checker from the loaded Makefile.
 - Rejected non-2xx and over-1-MiB OAuth user-profile responses before session
   state is created.
 - Added a 10-second default Foursquare HTTP client timeout while preserving

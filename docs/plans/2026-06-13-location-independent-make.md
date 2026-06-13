@@ -2,7 +2,7 @@
 title: Location-Independent Go Verification
 type: reliability
 date: 2026-06-13
-status: planned
+status: completed
 execution: code
 ---
 
@@ -42,8 +42,21 @@ the checkout.
 
 ## Work Completed
 
-Pending implementation.
+- Derived the repository root from the loaded Makefile and invoked the checker
+  through that absolute path.
+- Verified that existing Go formatting, vetting, testing, and module-integrity
+  commands already execute from the repository root.
+- Added rooted-Makefile, completed-plan, external-run, and synchronized-guidance
+  contracts while preserving application and dependency behavior.
 
 ## Verification Completed
 
-Pending implementation and verification.
+- `make check`, `make lint`, `make test`, and `make build` passed at repository
+  root and from /tmp through the absolute Makefile path.
+- Five isolated hostile root-derivation, checker-path, documentation,
+  plan-status, and verification-evidence mutations were rejected.
+- Go formatting, vetting, tests, module-integrity checks, shell syntax,
+  `git diff --check`, exact-path review, added-line secret scanning, and
+  generated-artifact inspection passed.
+- Credentialed Foursquare integration behavior was unavailable and is not
+  claimed.
