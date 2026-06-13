@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 )
 
 type failingReader struct {
@@ -56,6 +57,37 @@ func TestSuccessfulFoursquareStatusAcceptsOnly2xx(t *testing.T) {
 		if got := successfulFoursquareStatus(tt.status); got != tt.want {
 			t.Errorf("successfulFoursquareStatus(%d) = %t, want %t", tt.status, got, tt.want)
 		}
+	}
+}
+
+func TestNewFoursquareServiceDefaultsClientTimeout(t *testing.T) {
+	service := NewFoursquareService(&FoursquareConfig{})
+
+	if service.Config.Client.Timeout != foursquareRequestTimeout {
+		t.Fatalf("client timeout = %s, want %s", service.Config.Client.Timeout, foursquareRequestTimeout)
+	}
+}
+
+func TestNewFoursquareServicePreservesExplicitClientTimeout(t *testing.T) {
+	explicitTimeout := 3 * time.Second
+	service := NewFoursquareService(&FoursquareConfig{
+		Client: http.Client{Timeout: explicitTimeout},
+	})
+
+	if service.Config.Client.Timeout != explicitTimeout {
+		t.Fatalf("client timeout = %s, want %s", service.Config.Client.Timeout, explicitTimeout)
+	}
+}
+
+func TestNewFoursquareServiceDoesNotMutateCallerConfig(t *testing.T) {
+	config := &FoursquareConfig{}
+	service := NewFoursquareService(config)
+
+	if config.Client.Timeout != 0 {
+		t.Fatalf("caller client timeout = %s, want zero", config.Client.Timeout)
+	}
+	if service.Config == config {
+		t.Fatal("service config aliases caller config")
 	}
 }
 

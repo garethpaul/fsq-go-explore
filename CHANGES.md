@@ -2,6 +2,9 @@
 
 ## 2026-06-13
 
+- Added a 10-second default Foursquare HTTP client timeout while preserving
+  explicit positive caller values and caller configuration ownership.
+- Added focused constructor tests and mutation-sensitive timeout contracts.
 - Rejected non-2xx Foursquare search and venue detail responses before JSON decoding,
   preventing error envelopes from populating successful result structures.
 - Added focused transport tests and method-scoped static ordering contracts.

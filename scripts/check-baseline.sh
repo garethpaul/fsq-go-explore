@@ -19,6 +19,7 @@ RATE_LIMITER_REFILL_PLAN="$ROOT_DIR/docs/plans/2026-06-12-fsq-rate-limiter-refil
 EDIT_BODY_LIMIT_PLAN="$ROOT_DIR/docs/plans/2026-06-12-fsq-edit-body-limit.md"
 RESPONSE_BODY_LIMIT_PLAN="$ROOT_DIR/docs/plans/2026-06-13-fsq-response-body-limit.md"
 RESPONSE_STATUS_PLAN="$ROOT_DIR/docs/plans/2026-06-13-fsq-response-status-validation.md"
+CLIENT_TIMEOUT_PLAN="$ROOT_DIR/docs/plans/2026-06-13-foursquare-client-timeout.md"
 WORKFLOW="$ROOT_DIR/.github/workflows/check.yml"
 
 require_file() {
@@ -59,6 +60,8 @@ for path in \
   "docs/plans/2026-06-12-fsq-rate-limiter-refill.md" \
   "docs/plans/2026-06-12-fsq-edit-body-limit.md" \
   "docs/plans/2026-06-13-fsq-response-body-limit.md" \
+  "docs/plans/2026-06-13-fsq-response-status-validation.md" \
+  "docs/plans/2026-06-13-foursquare-client-timeout.md" \
   "docs/plans/2026-06-10-fsq-rate-limiter-key-cap.md" \
   "docs/plans/2026-06-09-fsq-login-protect-cache-key.md" \
   "docs/plans/2026-06-10-ci-baseline.md" \
@@ -112,6 +115,38 @@ if any(tests.count(item) != 1 for item in test_contracts):
     raise SystemExit("Foursquare response parsing must keep exact-limit, oversize, and read-error tests.")
 if "io.ReadAll(body)" in source:
     raise SystemExit("Foursquare response decoding must not read an unbounded body.")
+PY
+
+python3 - "$ROOT_DIR/fsq/api.go" "$ROOT_DIR/fsq/api_test.go" <<'PY'
+import sys
+from pathlib import Path
+
+source = Path(sys.argv[1]).read_text()
+tests = Path(sys.argv[2]).read_text()
+constructor = source.split("func NewFoursquareService", 1)[-1].split("\n}\n", 1)[0]
+required_source = (
+    "foursquareRequestTimeout   = 10 * time.Second",
+    "serviceConfig := *config",
+    "client := config.Client",
+    "if client.Timeout <= 0",
+    "client.Timeout = foursquareRequestTimeout",
+    "serviceConfig.Client = client",
+    "return &FoursquareService{Config: &serviceConfig}",
+)
+if any(item not in source for item in required_source):
+    raise SystemExit("Foursquare clients must receive the reviewed default timeout through cloned configuration.")
+if "config.Client.Timeout =" in constructor:
+    raise SystemExit("Foursquare service construction must not mutate the caller config.")
+
+required_tests = (
+    "TestNewFoursquareServiceDefaultsClientTimeout",
+    "TestNewFoursquareServicePreservesExplicitClientTimeout",
+    "TestNewFoursquareServiceDoesNotMutateCallerConfig",
+    "explicitTimeout := 3 * time.Second",
+    "service.Config == config",
+)
+if any(item not in tests for item in required_tests):
+    raise SystemExit("Focused tests must preserve timeout defaulting, explicit preservation, and caller immutability.")
 PY
 
 if command -v go >/dev/null 2>&1; then
@@ -559,6 +594,33 @@ if (
     raise SystemExit(
         "Venue edit body-limit plan must remain completed with actual verification recorded."
     )
+PY
+
+python3 - "$CLIENT_TIMEOUT_PLAN" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+plan = Path(sys.argv[1]).read_text()
+frontmatter = plan.split("---", 2)[1]
+statuses = re.findall(r"^status: .+$", frontmatter, flags=re.MULTILINE)
+verification = plan.split("## Verification Completed\n", 1)[-1]
+required = (
+    "timeout removal mutation failed",
+    "timeout drift mutation failed",
+    "unconditional override mutation failed",
+    "caller mutation mutation failed",
+    "focused test mutation failed",
+    "plan evidence mutation failed",
+    "hosted pull-request check",
+)
+if (
+    statuses != ["status: completed"]
+    or "## Verification Completed\n" not in plan
+    or any(item not in verification for item in required)
+    or re.search(r"\b(?:pending|todo|tbd|not run)\b", verification, re.IGNORECASE)
+):
+    raise SystemExit("Foursquare client timeout plan must remain completed with actual verification recorded.")
 PY
 
 printf '%s\n' "fsq-go-explore Go baseline checks passed."
