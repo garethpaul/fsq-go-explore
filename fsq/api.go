@@ -7,8 +7,10 @@ import (
 	"errors"
 	"io"
 	"log"
+	"mime"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"golang.org/x/oauth2"
@@ -26,6 +28,16 @@ var errFoursquareResponseTooLarge = errors.New("foursquare response body exceeds
 
 func successfulFoursquareStatus(statusCode int) bool {
 	return statusCode >= http.StatusOK && statusCode < http.StatusMultipleChoices
+}
+
+func isFoursquareJSONResponse(response *http.Response) bool {
+	mediaType, _, err := mime.ParseMediaType(response.Header.Get("Content-Type"))
+	if err != nil {
+		return false
+	}
+	mediaType = strings.ToLower(mediaType)
+	return mediaType == "application/json" ||
+		(strings.HasPrefix(mediaType, "application/") && strings.HasSuffix(mediaType, "+json"))
 }
 
 // Struct for FourceService to wrap around requests.
@@ -78,6 +90,10 @@ func (fsqs *FoursquareService) Search(vsr *VenueSearchRequest) (resp *VenueSearc
 		log.Printf("foursquare search request returned status=%d", r.StatusCode)
 		return venues
 	}
+	if !isFoursquareJSONResponse(r) {
+		log.Print("foursquare search response content type was rejected")
+		return venues
+	}
 	if err := decodeFoursquareResponse(r.Body, venues); err != nil {
 		log.Printf("foursquare search response decode failed: %v", err)
 	}
@@ -104,6 +120,10 @@ func (fsqs *FoursquareService) VenueDetails(id string) (resp *VenueResponse) {
 
 	if !successfulFoursquareStatus(r.StatusCode) {
 		log.Printf("foursquare venue details request returned status=%d", r.StatusCode)
+		return venue
+	}
+	if !isFoursquareJSONResponse(r) {
+		log.Print("foursquare venue details response content type was rejected")
 		return venue
 	}
 	if err := decodeFoursquareResponse(r.Body, venue); err != nil {

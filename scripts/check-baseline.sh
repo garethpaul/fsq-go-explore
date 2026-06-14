@@ -22,6 +22,8 @@ RESPONSE_STATUS_PLAN="$ROOT_DIR/docs/plans/2026-06-13-fsq-response-status-valida
 CLIENT_TIMEOUT_PLAN="$ROOT_DIR/docs/plans/2026-06-13-foursquare-client-timeout.md"
 OAUTH_USER_RESPONSE_PLAN="$ROOT_DIR/docs/plans/2026-06-13-oauth-user-response-boundary.md"
 LOCATION_INDEPENDENT_MAKE_PLAN="$ROOT_DIR/docs/plans/2026-06-13-location-independent-make.md"
+RESPONSE_CONTENT_TYPE_PLAN="$ROOT_DIR/docs/plans/2026-06-14-fsq-response-content-type.md"
+RESPONSE_CONTENT_TYPE_CHECK="$ROOT_DIR/scripts/check-response-content-type.py"
 WORKFLOW="$ROOT_DIR/.github/workflows/check.yml"
 
 require_file() {
@@ -59,6 +61,8 @@ for path in \
   "fsq/keys_test.go" \
   "limiter/limiter.go" \
   "limiter/config/config_test.go" \
+  "scripts/check-response-content-type.py" \
+  "docs/plans/2026-06-14-fsq-response-content-type.md" \
   "docs/plans/2026-06-12-fsq-rate-limiter-refill.md" \
   "docs/plans/2026-06-12-fsq-edit-body-limit.md" \
   "docs/plans/2026-06-13-fsq-response-body-limit.md" \
@@ -82,6 +86,11 @@ for path in \
 done
 
 require_file "docs/plans/2026-06-13-location-independent-make.md"
+
+python3 "$RESPONSE_CONTENT_TYPE_CHECK" \
+  "$ROOT_DIR/fsq/api.go" \
+  "$ROOT_DIR/fsq/api_test.go" \
+  "$RESPONSE_CONTENT_TYPE_PLAN"
 
 if ! grep -Fq 'ROOT := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))' "$ROOT_DIR/Makefile" ||
   ! grep -Fq '"$(ROOT)/scripts/check-baseline.sh"' "$ROOT_DIR/Makefile"; then
