@@ -20,6 +20,9 @@ import (
 const (
 	SEARCH_URL                 = "https://api.foursquare.com/v2/venues/search?"
 	VENUE_URL                  = "https://api.foursquare.com/v2/venues/"
+	foursquareAPIHost          = "api.foursquare.com"
+	foursquareSearchPath       = "/v2/venues/search"
+	foursquareVenuePathPrefix  = "/v2/venues/"
 	maxFoursquareResponseBytes = 2 * 1024 * 1024
 	foursquareRequestTimeout   = 10 * time.Second
 )
@@ -28,6 +31,20 @@ var errFoursquareResponseTooLarge = errors.New("foursquare response body exceeds
 
 func successfulFoursquareStatus(statusCode int) bool {
 	return statusCode >= http.StatusOK && statusCode < http.StatusMultipleChoices
+}
+
+func isExpectedFoursquareResponseURL(response *http.Response, expectedEscapedPath string) bool {
+	if response == nil || response.Request == nil || response.Request.URL == nil {
+		return false
+	}
+
+	responseURL := response.Request.URL
+	return responseURL.Scheme == "https" &&
+		strings.EqualFold(responseURL.Hostname(), foursquareAPIHost) &&
+		responseURL.User == nil &&
+		responseURL.Port() == "" &&
+		responseURL.EscapedPath() == expectedEscapedPath &&
+		responseURL.Fragment == ""
 }
 
 func isFoursquareJSONResponse(response *http.Response) bool {
@@ -101,6 +118,10 @@ func (fsqs *FoursquareService) Search(vsr *VenueSearchRequest) (resp *VenueSearc
 		log.Printf("foursquare search request returned status=%d", r.StatusCode)
 		return venues
 	}
+	if !isExpectedFoursquareResponseURL(r, foursquareSearchPath) {
+		log.Print("foursquare search response final URL was rejected")
+		return venues
+	}
 	if !isFoursquareJSONResponse(r) {
 		log.Print("foursquare search response content type was rejected")
 		return venues
@@ -120,6 +141,7 @@ func (fsqs *FoursquareService) VenueDetails(id string) (resp *VenueResponse) {
 
 	params := foursquareConfig.userParams()
 	client := foursquareConfig.Client
+	venuePath := foursquareVenuePathPrefix + url.PathEscape(id)
 	requestURL := VENUE_URL + url.PathEscape(id) + "?" + params.Encode()
 	r, err := client.Get(requestURL)
 
@@ -131,6 +153,10 @@ func (fsqs *FoursquareService) VenueDetails(id string) (resp *VenueResponse) {
 
 	if !successfulFoursquareStatus(r.StatusCode) {
 		log.Printf("foursquare venue details request returned status=%d", r.StatusCode)
+		return venue
+	}
+	if !isExpectedFoursquareResponseURL(r, venuePath) {
+		log.Print("foursquare venue details response final URL was rejected")
 		return venue
 	}
 	if !isFoursquareJSONResponse(r) {
@@ -148,6 +174,7 @@ func (fsqs *FoursquareService) VenueDetails(id string) (resp *VenueResponse) {
 func (fsqs *FoursquareService) VenueEdit(venueId string, vals url.Values) {
 	foursquareConfig := fsqs.Config
 	params := foursquareConfig.userParams()
+	venueEditPath := foursquareVenuePathPrefix + url.PathEscape(venueId) + "/proposeedit"
 	requestURL := VENUE_URL + url.PathEscape(venueId) + "/proposeedit?" + params.Encode()
 	client := foursquareConfig.Client
 	req, err := http.NewRequest(http.MethodPost, requestURL, bytes.NewBufferString(vals.Encode()))
@@ -165,6 +192,10 @@ func (fsqs *FoursquareService) VenueEdit(venueId string, vals url.Values) {
 	defer resp.Body.Close()
 	if !successfulFoursquareStatus(resp.StatusCode) {
 		log.Printf("foursquare venue edit request returned status=%d", resp.StatusCode)
+		return
+	}
+	if !isExpectedFoursquareResponseURL(resp, venueEditPath) {
+		log.Print("foursquare venue edit response final URL was rejected")
 		return
 	}
 	if err := discardFoursquareResponse(resp.Body); err != nil {

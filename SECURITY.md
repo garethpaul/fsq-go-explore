@@ -65,6 +65,9 @@ Non-2xx Foursquare search and venue detail responses must not reach JSON decodin
 status failures should log only the numeric status and return empty results.
 Venue edit responses must reject non-2xx status before body reads and bound
 successful response disposal to 2 MiB plus one detection byte.
+Successful search, venue-detail, and venue-edit responses must retain the exact
+final HTTPS Foursquare API host and operation path before response reads or
+decoding. Rejections must not log final URLs, query credentials, or bodies.
 Foursquare HTTP clients should use a 10-second default end-to-end timeout when
 no positive caller timeout is configured; service construction must not mutate
 caller-owned configuration.

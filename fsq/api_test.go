@@ -52,7 +52,11 @@ func (r *failingReader) Read(p []byte) (int, error) {
 type roundTripFunc func(*http.Request) (*http.Response, error)
 
 func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
-	return f(req)
+	response, err := f(req)
+	if response != nil && response.Request == nil {
+		response.Request = req
+	}
+	return response, err
 }
 
 func testResponse(body string) *http.Response {
@@ -101,6 +105,80 @@ func TestFoursquareJSONResponseMediaTypes(t *testing.T) {
 		if isFoursquareJSONResponse(response) {
 			t.Errorf("isFoursquareJSONResponse(%q) = true, want false", contentType)
 		}
+	}
+}
+
+func TestExpectedFoursquareResponseURL(t *testing.T) {
+	tests := []struct {
+		name         string
+		responseURL  string
+		expectedPath string
+		want         bool
+	}{
+		{name: "search", responseURL: "https://api.foursquare.com/v2/venues/search?near=Portland", expectedPath: "/v2/venues/search", want: true},
+		{name: "escaped venue", responseURL: "https://api.foursquare.com/v2/venues/venue%2F123?v=20260614", expectedPath: "/v2/venues/venue%2F123", want: true},
+		{name: "http", responseURL: "http://api.foursquare.com/v2/venues/search", expectedPath: "/v2/venues/search"},
+		{name: "different host", responseURL: "https://example.com/v2/venues/search", expectedPath: "/v2/venues/search"},
+		{name: "userinfo", responseURL: "https://user@api.foursquare.com/v2/venues/search", expectedPath: "/v2/venues/search"},
+		{name: "port", responseURL: "https://api.foursquare.com:443/v2/venues/search", expectedPath: "/v2/venues/search"},
+		{name: "different path", responseURL: "https://api.foursquare.com/v2/venues/explore", expectedPath: "/v2/venues/search"},
+		{name: "fragment", responseURL: "https://api.foursquare.com/v2/venues/search#result", expectedPath: "/v2/venues/search"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			responseURL, err := url.Parse(tt.responseURL)
+			if err != nil {
+				t.Fatalf("url.Parse(%q): %v", tt.responseURL, err)
+			}
+			response := &http.Response{Request: &http.Request{URL: responseURL}}
+			if got := isExpectedFoursquareResponseURL(response, tt.expectedPath); got != tt.want {
+				t.Fatalf("isExpectedFoursquareResponseURL(%q, %q) = %t, want %t", tt.responseURL, tt.expectedPath, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestFoursquareOperationsRejectUnexpectedFinalURLBeforeRead(t *testing.T) {
+	tests := []struct {
+		name string
+		call func(*FoursquareService)
+	}{
+		{name: "search", call: func(service *FoursquareService) {
+			service.Search(&VenueSearchRequest{Near: "Portland", Query: "coffee"})
+		}},
+		{name: "venue details", call: func(service *FoursquareService) {
+			service.VenueDetails("venue-1")
+		}},
+		{name: "venue edit", call: func(service *FoursquareService) {
+			service.VenueEdit("venue-1", url.Values{"name": []string{"New Name"}})
+		}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			body := &trackingReadCloser{}
+			unexpectedURL, err := url.Parse("https://example.com/v2/venues/search")
+			if err != nil {
+				t.Fatalf("url.Parse: %v", err)
+			}
+			service := NewFoursquareService(&FoursquareConfig{
+				ClientId: "client-id", ClientSecret: "client-secret", AccessToken: "token", Version: "20260614",
+				Client: http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+					return &http.Response{
+						StatusCode: http.StatusOK,
+						Body:       body,
+						Header:     http.Header{"Content-Type": []string{"application/json"}},
+						Request:    &http.Request{URL: unexpectedURL},
+					}, nil
+				})},
+			})
+
+			tt.call(service)
+			if body.readCalls != 0 {
+				t.Fatalf("response body reads = %d, want 0", body.readCalls)
+			}
+		})
 	}
 }
 

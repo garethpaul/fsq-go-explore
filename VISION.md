@@ -59,6 +59,8 @@ Current baseline:
   so upstream error envelopes cannot become successful venue data.
 - Venue edit responses reject non-2xx status before a bounded discard of
   successful response bodies.
+- Foursquare responses retain the exact final HTTPS API host and operation path
+  before media validation, decoding, or successful body disposal.
 - Foursquare HTTP clients default to a 10-second end-to-end timeout while
   preserving explicit positive caller values and caller configuration ownership.
 - Search query and location parameters are trimmed and length-bounded before
@@ -92,6 +94,7 @@ Next priorities:
 - Keep Foursquare response bodies bounded before JSON parsing
 - Keep non-2xx Foursquare search and venue detail responses out of JSON decoding
 - Keep venue edit response status checks ahead of bounded body disposal
+- Keep final Foursquare response endpoint checks ahead of response reads
 - Keep the default Foursquare client timeout and caller immutability covered
 - Keep search parameter bounds covered as request parsing changes
 - Keep local verification targets available as the Go/App Engine toolchain

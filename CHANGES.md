@@ -2,6 +2,8 @@
 
 ## 2026-06-14
 
+- Required search, venue-detail, and venue-edit responses to retain the exact
+  final HTTPS Foursquare API host and operation path before response reads.
 - Bounded successful venue edit response disposal to 2 MiB plus one detection
   byte and rejected non-2xx statuses before body reads.
 

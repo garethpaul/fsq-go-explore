@@ -54,6 +54,8 @@
   decoding, and keep status logs free of URLs, credentials, tokens, and bodies.
 - Reject non-2xx venue edit responses before body reads and keep successful
   response disposal bounded to the shared 2 MiB limit plus one detection byte.
+- Require search, venue-detail, and venue-edit responses to retain the exact
+  final HTTPS Foursquare API host and operation path before reads or decoding.
 - Keep the 10-second default Foursquare client timeout conditional, preserve
   explicit positive timeouts, and do not mutate caller-owned configuration.
 

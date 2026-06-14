@@ -1,7 +1,7 @@
 ---
 title: Foursquare Response Final URL Boundary
 date: 2026-06-14
-status: in_progress
+status: completed
 execution: code
 ---
 
@@ -50,8 +50,24 @@ to reach JSON decoding or successful-body disposal.
 
 ## Work Completed
 
-- Pending implementation.
+- Added one exact final-response URL validator covering HTTPS, the Foursquare
+  API host, absent userinfo/port/fragment, and each operation's escaped path.
+- Required search, venue-detail, and venue-edit responses to pass the validator
+  after 2xx status and before media checks, decoding, or bounded disposal.
+- Added focused endpoint and unread-body regressions, a mutation-sensitive
+  static contract, baseline integration, and synchronized repository guidance.
 
 ## Verification Completed
 
-- Pending implementation and verification.
+- The focused final URL tests passed for exact endpoints and all three rejected
+  operation responses.
+- All-package tests, race tests, vet, and module integrity passed.
+- All four Make gates and the external-directory Make gate passed.
+- The six hostile mutations were rejected across scheme, host, operation-call,
+  validation-order, executable-test, and completed-plan evidence weakening.
+- Formatting, shell/Python syntax, exact diff, generated-artifact, protected
+  dependency/workflow, whitespace, conflict-marker, and changed-line credential
+  audits passed.
+- No live Foursquare request or App Engine deployment was performed.
+- The hosted pull-request and security-alert result is recorded against the
+  exact pushed head in the external engineering tracker.
