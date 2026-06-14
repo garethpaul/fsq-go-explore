@@ -40,6 +40,17 @@ func isFoursquareJSONResponse(response *http.Response) bool {
 		(strings.HasPrefix(mediaType, "application/") && strings.HasSuffix(mediaType, "+json"))
 }
 
+func discardFoursquareResponse(body io.Reader) error {
+	written, err := io.Copy(io.Discard, io.LimitReader(body, maxFoursquareResponseBytes+1))
+	if err != nil {
+		return err
+	}
+	if written > maxFoursquareResponseBytes {
+		return errFoursquareResponseTooLarge
+	}
+	return nil
+}
+
 // Struct for FourceService to wrap around requests.
 type FoursquareService struct {
 	Config *FoursquareConfig
@@ -152,11 +163,12 @@ func (fsqs *FoursquareService) VenueEdit(venueId string, vals url.Values) {
 		return
 	}
 	defer resp.Body.Close()
-	if _, err := io.Copy(io.Discard, resp.Body); err != nil {
-		log.Printf("foursquare venue edit response drain failed: %v", err)
-	}
-	if resp.StatusCode >= http.StatusBadRequest {
+	if !successfulFoursquareStatus(resp.StatusCode) {
 		log.Printf("foursquare venue edit request returned status=%d", resp.StatusCode)
+		return
+	}
+	if err := discardFoursquareResponse(resp.Body); err != nil {
+		log.Printf("foursquare venue edit response discard failed: %v", err)
 	}
 }
 

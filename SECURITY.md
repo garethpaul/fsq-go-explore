@@ -63,6 +63,8 @@ Foursquare JSON response bodies must remain limited to 2 MiB before parsing;
 oversized or failed reads should not reach JSON unmarshalling.
 Non-2xx Foursquare search and venue detail responses must not reach JSON decoding;
 status failures should log only the numeric status and return empty results.
+Venue edit responses must reject non-2xx status before body reads and bound
+successful response disposal to 2 MiB plus one detection byte.
 Foursquare HTTP clients should use a 10-second default end-to-end timeout when
 no positive caller timeout is configured; service construction must not mutate
 caller-owned configuration.

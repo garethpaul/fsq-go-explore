@@ -23,6 +23,7 @@ CLIENT_TIMEOUT_PLAN="$ROOT_DIR/docs/plans/2026-06-13-foursquare-client-timeout.m
 OAUTH_USER_RESPONSE_PLAN="$ROOT_DIR/docs/plans/2026-06-13-oauth-user-response-boundary.md"
 LOCATION_INDEPENDENT_MAKE_PLAN="$ROOT_DIR/docs/plans/2026-06-13-location-independent-make.md"
 RESPONSE_CONTENT_TYPE_PLAN="$ROOT_DIR/docs/plans/2026-06-14-fsq-response-content-type.md"
+VENUE_EDIT_RESPONSE_PLAN="$ROOT_DIR/docs/plans/2026-06-14-fsq-venue-edit-response-boundary.md"
 RESPONSE_CONTENT_TYPE_CHECK="$ROOT_DIR/scripts/check-response-content-type.py"
 WORKFLOW="$ROOT_DIR/.github/workflows/check.yml"
 
@@ -63,6 +64,7 @@ for path in \
   "limiter/config/config_test.go" \
   "scripts/check-response-content-type.py" \
   "docs/plans/2026-06-14-fsq-response-content-type.md" \
+  "docs/plans/2026-06-14-fsq-venue-edit-response-boundary.md" \
   "docs/plans/2026-06-12-fsq-rate-limiter-refill.md" \
   "docs/plans/2026-06-12-fsq-edit-body-limit.md" \
   "docs/plans/2026-06-13-fsq-response-body-limit.md" \
@@ -119,9 +121,9 @@ from pathlib import Path
 
 source = Path(sys.argv[1]).read_text()
 tests = Path(sys.argv[2]).read_text()
+decoder = source.split("func decodeFoursquareResponse", 1)[-1]
+decoder_tests = tests.split("func TestDecodeFoursquareResponseAcceptsExactLimit", 1)[-1]
 source_contracts = (
-    "maxFoursquareResponseBytes = 2 * 1024 * 1024",
-    'errFoursquareResponseTooLarge = errors.New("foursquare response body exceeds 2 MiB")',
     "io.ReadAll(io.LimitReader(body, maxFoursquareResponseBytes+1))",
     "if len(data) > maxFoursquareResponseBytes",
     "return errFoursquareResponseTooLarge",
@@ -132,15 +134,21 @@ test_contracts = (
     "TestDecodeFoursquareResponsePreservesReadError",
     "TestDecodeFoursquareResponseRejectsEmptyBody",
     "TestDecodeFoursquareResponseRejectsMalformedJSON",
-    "maxFoursquareResponseBytes+1",
-    "errors.Is(err, errFoursquareResponseTooLarge)",
-    "errors.Is(err, errTestReadFailure)",
 )
 
-if any(source.count(item) != 1 for item in source_contracts):
+if source.count("maxFoursquareResponseBytes = 2 * 1024 * 1024") != 1 or source.count(
+    'errFoursquareResponseTooLarge = errors.New("foursquare response body exceeds 2 MiB")'
+) != 1 or any(decoder.count(item) != 1 for item in source_contracts):
     raise SystemExit("Foursquare response decoding must keep one exact 2 MiB parse boundary.")
 if any(tests.count(item) != 1 for item in test_contracts):
     raise SystemExit("Foursquare response parsing must keep exact-limit, oversize, and read-error tests.")
+for item in (
+    "maxFoursquareResponseBytes+1",
+    "errors.Is(err, errFoursquareResponseTooLarge)",
+    "errors.Is(err, errTestReadFailure)",
+):
+    if decoder_tests.count(item) != 1:
+        raise SystemExit("Foursquare response parsing tests must preserve the decoder-specific boundary assertions.")
 if "io.ReadAll(body)" in source:
     raise SystemExit("Foursquare response decoding must not read an unbounded body.")
 PY
@@ -289,6 +297,9 @@ search = source.split("func (fsqs *FoursquareService) Search", 1)[-1].split(
 details = source.split("func (fsqs *FoursquareService) VenueDetails", 1)[-1].split(
     "\n// ProposeEdit", 1
 )[0]
+edit = source.split("func (fsqs *FoursquareService) VenueEdit", 1)[-1].split(
+    "\n// Get the url params", 1
+)[0]
 guard = "if !successfulFoursquareStatus(r.StatusCode)"
 decoder = "decodeFoursquareResponse(r.Body"
 
@@ -302,6 +313,23 @@ for name, method in (("search", search), ("venue details", details)):
     if method.index(guard) > method.index(decoder):
         raise SystemExit(f"Foursquare {name} status validation must run before response decoding.")
 
+edit_guard = "if !successfulFoursquareStatus(resp.StatusCode)"
+edit_discard = "discardFoursquareResponse(resp.Body)"
+if edit.count(edit_guard) != 1 or edit.count(edit_discard) != 1:
+    raise SystemExit("Venue edits must retain one exact status guard and one bounded response discard.")
+if edit.index(edit_guard) > edit.index(edit_discard):
+    raise SystemExit("Venue edit status validation must run before response body reads.")
+discard = source.split("func discardFoursquareResponse", 1)[-1].split(
+    "\n// Struct for", 1
+)[0]
+for item in (
+    "io.Copy(io.Discard, io.LimitReader(body, maxFoursquareResponseBytes+1))",
+    "written > maxFoursquareResponseBytes",
+    "return errFoursquareResponseTooLarge",
+):
+    if discard.count(item) != 1:
+        raise SystemExit("Venue edit response disposal must preserve the 2 MiB limit-plus-one boundary.")
+
 required_tests = (
     "TestSuccessfulFoursquareStatusAcceptsOnly2xx",
     "TestSearchRejectsNonSuccessResponseBeforeDecode",
@@ -311,6 +339,13 @@ required_tests = (
     "http.StatusInternalServerError",
     "http.StatusBadGateway",
     '"must-not-decode"',
+    "TestVenueEditRejectsNonSuccessBeforeRead",
+    "TestVenueEditBoundsSuccessfulResponseBody",
+    "TestDiscardFoursquareResponseAcceptsExactLimit",
+    "TestDiscardFoursquareResponseRejectsOversizeBody",
+    "TestDiscardFoursquareResponsePreservesReadError",
+    "body.readCalls != 0",
+    "body.bytesRead != maxFoursquareResponseBytes+1",
 )
 if any(tests.count(item) < 1 for item in required_tests):
     raise SystemExit("Non-2xx Foursquare search and detail behavior must retain focused transport tests.")
@@ -611,6 +646,32 @@ if (
     )
 PY
 
+python3 - "$VENUE_EDIT_RESPONSE_PLAN" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+plan = Path(sys.argv[1]).read_text()
+frontmatter = plan.split("---", 2)[1]
+statuses = re.findall(r"^status: .+$", frontmatter, flags=re.MULTILINE)
+verification = plan.split("## Verification Completed\n", 1)[-1]
+required = (
+    "status ordering mutation failed",
+    "unbounded discard mutation failed",
+    "oversize detection mutation failed",
+    "focused test mutation failed",
+    "plan evidence mutation failed",
+    "hosted pull-request check",
+)
+if (
+    statuses != ["status: completed"]
+    or "## Verification Completed\n" not in plan
+    or any(item not in verification for item in required)
+    or re.search(r"\b(?:pending|todo|tbd|not run|not yet)\b", verification, re.IGNORECASE)
+):
+    raise SystemExit("Venue edit response plan must remain completed with actual verification recorded.")
+PY
+
 if ! grep -Fq "Foursquare JSON response bodies are limited to 2 MiB" "$ROOT_DIR/README.md" ||
   ! grep -Fq "Foursquare JSON response bodies must remain limited to 2 MiB" "$ROOT_DIR/SECURITY.md" ||
   ! grep -Fq "Foursquare JSON response parsing is limited to 2 MiB" "$ROOT_DIR/VISION.md" ||
@@ -624,6 +685,15 @@ if ! grep -Fq "Non-2xx Foursquare search and venue detail responses are rejected
   ! grep -Fq "Non-2xx Foursquare search and venue detail responses are rejected before decoding" "$ROOT_DIR/VISION.md" ||
   ! grep -Fq "Rejected non-2xx Foursquare search and venue detail responses before JSON decoding" "$ROOT_DIR/CHANGES.md"; then
   printf '%s\n' "Project guidance must document the Foursquare response status boundary." >&2
+  exit 1
+fi
+
+if ! grep -Fq "Venue edit responses require 2xx status before a bounded 2 MiB discard" "$ROOT_DIR/README.md" ||
+  ! grep -Fq "Venue edit responses must reject non-2xx status before body reads" "$ROOT_DIR/SECURITY.md" ||
+  ! grep -Fq "Venue edit responses reject non-2xx status before a bounded discard" "$ROOT_DIR/VISION.md" ||
+  ! grep -Fq "Bounded successful venue edit response disposal to 2 MiB" "$ROOT_DIR/CHANGES.md" ||
+  ! grep -Fq "Reject non-2xx venue edit responses before body reads" "$ROOT_DIR/AGENTS.md"; then
+  printf '%s\n' "Project guidance must document the venue edit response boundary." >&2
   exit 1
 fi
 

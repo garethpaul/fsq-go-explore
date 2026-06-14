@@ -14,6 +14,31 @@ type failingReader struct {
 	read bool
 }
 
+type trackingReadCloser struct {
+	readCalls int
+}
+
+func (r *trackingReadCloser) Read([]byte) (int, error) {
+	r.readCalls++
+	return 0, io.EOF
+}
+
+func (r *trackingReadCloser) Close() error { return nil }
+
+type unboundedReadCloser struct {
+	bytesRead int
+}
+
+func (r *unboundedReadCloser) Read(p []byte) (int, error) {
+	for i := range p {
+		p[i] = 'x'
+	}
+	r.bytesRead += len(p)
+	return len(p), nil
+}
+
+func (r *unboundedReadCloser) Close() error { return nil }
+
 var errTestReadFailure = errors.New("read failed")
 
 func (r *failingReader) Read(p []byte) (int, error) {
@@ -226,6 +251,60 @@ func TestVenueEditEscapesVenueIDAndSendsForm(t *testing.T) {
 	}
 	if gotBody != "name=New+Name" {
 		t.Fatalf("body = %q, want encoded form", gotBody)
+	}
+}
+
+func TestVenueEditRejectsNonSuccessBeforeRead(t *testing.T) {
+	for _, status := range []int{http.StatusContinue, http.StatusMultipleChoices, http.StatusInternalServerError} {
+		body := &trackingReadCloser{}
+		service := NewFoursquareService(&FoursquareConfig{
+			AccessToken: "token",
+			Version:     "20260614",
+			Client: http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+				return &http.Response{StatusCode: status, Body: body, Header: make(http.Header)}, nil
+			})},
+		})
+
+		service.VenueEdit("venue-1", url.Values{"name": []string{"New Name"}})
+		if body.readCalls != 0 {
+			t.Fatalf("VenueEdit status %d body reads = %d, want 0", status, body.readCalls)
+		}
+	}
+}
+
+func TestVenueEditBoundsSuccessfulResponseBody(t *testing.T) {
+	body := &unboundedReadCloser{}
+	service := NewFoursquareService(&FoursquareConfig{
+		AccessToken: "token",
+		Version:     "20260614",
+		Client: http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+			return &http.Response{StatusCode: http.StatusOK, Body: body, Header: make(http.Header)}, nil
+		})},
+	})
+
+	service.VenueEdit("venue-1", url.Values{"name": []string{"New Name"}})
+	if body.bytesRead != maxFoursquareResponseBytes+1 {
+		t.Fatalf("VenueEdit body bytes read = %d, want %d", body.bytesRead, maxFoursquareResponseBytes+1)
+	}
+}
+
+func TestDiscardFoursquareResponseAcceptsExactLimit(t *testing.T) {
+	if err := discardFoursquareResponse(strings.NewReader(strings.Repeat("x", maxFoursquareResponseBytes))); err != nil {
+		t.Fatalf("discardFoursquareResponse exact limit: %v", err)
+	}
+}
+
+func TestDiscardFoursquareResponseRejectsOversizeBody(t *testing.T) {
+	err := discardFoursquareResponse(strings.NewReader(strings.Repeat("x", maxFoursquareResponseBytes+1)))
+	if !errors.Is(err, errFoursquareResponseTooLarge) {
+		t.Fatalf("discardFoursquareResponse error = %v, want %v", err, errFoursquareResponseTooLarge)
+	}
+}
+
+func TestDiscardFoursquareResponsePreservesReadError(t *testing.T) {
+	err := discardFoursquareResponse(&failingReader{})
+	if !errors.Is(err, errTestReadFailure) {
+		t.Fatalf("discardFoursquareResponse error = %v, want %v", err, errTestReadFailure)
 	}
 }
 

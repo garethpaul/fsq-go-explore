@@ -90,6 +90,8 @@ decoding so an unexpectedly large upstream response cannot grow process memory
 without an application boundary.
 Non-2xx Foursquare search and venue detail responses are rejected before JSON decoding,
 so error envelopes cannot populate successful venue result structures.
+Venue edit responses require 2xx status before a bounded 2 MiB discard, so
+rejected or oversized upstream bodies cannot trigger unbounded reads.
 Foursquare HTTP clients receive a 10-second default end-to-end timeout when
 callers do not provide a positive timeout; explicit positive values are kept.
 OAuth user-profile responses require a 2xx status before reads and are limited
@@ -180,6 +182,8 @@ When the required SDK or runtime is unavailable, use static checks and source re
   body boundary.
 - See `docs/plans/2026-06-13-fsq-response-body-limit.md` for the Foursquare JSON
   response parse boundary.
+- See `docs/plans/2026-06-14-fsq-venue-edit-response-boundary.md` for the venue
+  edit status and response-disposal boundary.
 - See `docs/plans/2026-06-13-fsq-response-status-validation.md` for upstream
   search and venue detail status validation.
 - See `docs/plans/2026-06-13-foursquare-client-timeout.md` for the default

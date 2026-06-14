@@ -1,7 +1,7 @@
 ---
 title: Foursquare Venue Edit Response Boundary
 date: 2026-06-14
-status: planned
+status: completed
 execution: code
 ---
 
@@ -44,8 +44,23 @@ status logic.
 
 ## Work Completed
 
-- Not yet implemented.
+- Added a shared bounded response discard that reads at most 2 MiB plus one
+  detection byte and reports the existing oversized-response sentinel.
+- Required exact 2xx venue-edit status before invoking the discard, leaving
+  rejected response bodies unread.
+- Added focused runtime and static contracts plus synchronized guidance.
 
 ## Verification Completed
 
-- Not yet run.
+- Focused package tests, all-package tests, race tests, vet, module integrity,
+  all four Make gates, and the external-directory Make gate passed.
+- The status ordering mutation failed before a rejected body could be read.
+- The unbounded discard mutation failed the source boundary contract.
+- The oversize detection mutation failed the limit-plus-one contract.
+- The focused test mutation failed the unique regression-test contract.
+- The plan evidence mutation failed the completed-evidence contract.
+- Formatting, shell syntax, exact diff, artifact, dependency/workflow,
+  whitespace, conflict-marker, and changed-line credential audits passed.
+- No live Foursquare request or App Engine deployment was performed.
+- The hosted pull-request check and code-scanning result are recorded against
+  the exact pushed head in the external engineering tracker.

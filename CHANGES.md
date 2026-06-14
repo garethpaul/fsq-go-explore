@@ -1,5 +1,10 @@
 # Changes
 
+## 2026-06-14
+
+- Bounded successful venue edit response disposal to 2 MiB plus one detection
+  byte and rejected non-2xx statuses before body reads.
+
 ## 2026-06-13
 
 - Made Go verification independent of the caller's working directory by
