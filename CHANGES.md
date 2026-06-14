@@ -2,6 +2,8 @@
 
 ## 2026-06-14
 
+- Required OAuth user-profile responses to retain the exact final HTTPS
+  Foursquare endpoint and a JSON media type before response reads.
 - Required search, venue-detail, and venue-edit responses to retain the exact
   final HTTPS Foursquare API host and operation path before response reads.
 - Bounded successful venue edit response disposal to 2 MiB plus one detection

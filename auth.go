@@ -8,6 +8,7 @@ import (
 	"errors"
 	"io"
 	"log"
+	"mime"
 	"net/http"
 	"net/url"
 	"os"
@@ -42,11 +43,15 @@ var (
 const (
 	userCacheKeyPrefix        = "user:"
 	maxOAuthUserResponseBytes = 1 * 1024 * 1024
+	oauthUserResponseHost     = "api.foursquare.com"
+	oauthUserResponsePath     = "/v2/users/self"
 )
 
 var (
-	errOAuthUserResponseStatus   = errors.New("foursquare user response status was not successful")
-	errOAuthUserResponseTooLarge = errors.New("foursquare user response exceeded the size limit")
+	errOAuthUserResponseStatus    = errors.New("foursquare user response status was not successful")
+	errOAuthUserResponseOrigin    = errors.New("foursquare user response origin was not expected")
+	errOAuthUserResponseMediaType = errors.New("foursquare user response media type was not JSON")
+	errOAuthUserResponseTooLarge  = errors.New("foursquare user response exceeded the size limit")
 )
 
 func newOAuthState() (string, error) {
@@ -226,6 +231,12 @@ func decodeOAuthUserResponse(response *http.Response) (*fsq.UserResponse, error)
 	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
 		return nil, errOAuthUserResponseStatus
 	}
+	if !isExpectedOAuthUserResponseURL(response) {
+		return nil, errOAuthUserResponseOrigin
+	}
+	if !isOAuthUserJSONResponse(response) {
+		return nil, errOAuthUserResponseMediaType
+	}
 
 	body, err := io.ReadAll(io.LimitReader(response.Body, maxOAuthUserResponseBytes+1))
 	if err != nil {
@@ -244,6 +255,30 @@ func decodeOAuthUserResponse(response *http.Response) (*fsq.UserResponse, error)
 		return nil, err
 	}
 	return user, nil
+}
+
+func isExpectedOAuthUserResponseURL(response *http.Response) bool {
+	if response == nil || response.Request == nil || response.Request.URL == nil {
+		return false
+	}
+
+	responseURL := response.Request.URL
+	return responseURL.Scheme == "https" &&
+		strings.EqualFold(responseURL.Hostname(), oauthUserResponseHost) &&
+		responseURL.User == nil &&
+		responseURL.Port() == "" &&
+		responseURL.EscapedPath() == oauthUserResponsePath &&
+		responseURL.Fragment == ""
+}
+
+func isOAuthUserJSONResponse(response *http.Response) bool {
+	mediaType, _, err := mime.ParseMediaType(response.Header.Get("Content-Type"))
+	if err != nil {
+		return false
+	}
+	mediaType = strings.ToLower(mediaType)
+	return mediaType == "application/json" ||
+		(strings.HasPrefix(mediaType, "application/") && strings.HasSuffix(mediaType, "+json"))
 }
 
 // Process a request and cache using headers.

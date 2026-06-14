@@ -21,6 +21,7 @@ RESPONSE_BODY_LIMIT_PLAN="$ROOT_DIR/docs/plans/2026-06-13-fsq-response-body-limi
 RESPONSE_STATUS_PLAN="$ROOT_DIR/docs/plans/2026-06-13-fsq-response-status-validation.md"
 CLIENT_TIMEOUT_PLAN="$ROOT_DIR/docs/plans/2026-06-13-foursquare-client-timeout.md"
 OAUTH_USER_RESPONSE_PLAN="$ROOT_DIR/docs/plans/2026-06-13-oauth-user-response-boundary.md"
+OAUTH_USER_ORIGIN_PLAN="$ROOT_DIR/docs/plans/2026-06-14-oauth-user-response-origin.md"
 LOCATION_INDEPENDENT_MAKE_PLAN="$ROOT_DIR/docs/plans/2026-06-13-location-independent-make.md"
 RESPONSE_CONTENT_TYPE_PLAN="$ROOT_DIR/docs/plans/2026-06-14-fsq-response-content-type.md"
 VENUE_EDIT_RESPONSE_PLAN="$ROOT_DIR/docs/plans/2026-06-14-fsq-venue-edit-response-boundary.md"
@@ -69,6 +70,7 @@ for path in \
   "docs/plans/2026-06-14-fsq-response-content-type.md" \
   "docs/plans/2026-06-14-fsq-venue-edit-response-boundary.md" \
   "docs/plans/2026-06-14-fsq-response-final-url-boundary.md" \
+  "docs/plans/2026-06-14-oauth-user-response-origin.md" \
   "docs/plans/2026-06-12-fsq-rate-limiter-refill.md" \
   "docs/plans/2026-06-12-fsq-edit-body-limit.md" \
   "docs/plans/2026-06-13-fsq-response-body-limit.md" \
@@ -245,7 +247,11 @@ decoder = source.split("func decodeOAuthUserResponse", 1)[-1].split(
 )[0]
 required_source = (
     "maxOAuthUserResponseBytes = 1 * 1024 * 1024",
+    'oauthUserResponseHost     = "api.foursquare.com"',
+    'oauthUserResponsePath     = "/v2/users/self"',
     "response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices",
+    "if !isExpectedOAuthUserResponseURL(response)",
+    "if !isOAuthUserJSONResponse(response)",
     "io.ReadAll(io.LimitReader(response.Body, maxOAuthUserResponseBytes+1))",
     "len(body) > maxOAuthUserResponseBytes",
     "json.Unmarshal(body, wrapper)",
@@ -254,9 +260,37 @@ required_source = (
 if any(item not in source for item in required_source):
     raise SystemExit("OAuth user responses must keep status and 1 MiB decode boundaries.")
 status = decoder.find("response.StatusCode < http.StatusOK")
+origin = decoder.find("if !isExpectedOAuthUserResponseURL(response)")
+media = decoder.find("if !isOAuthUserJSONResponse(response)")
 read = decoder.find("io.ReadAll(io.LimitReader")
-if status < 0 or read < 0 or status >= read:
-    raise SystemExit("OAuth user response status validation must precede body reads.")
+if min(status, origin, media, read) < 0 or not status < origin < media < read:
+    raise SystemExit("OAuth user response status, origin, and media checks must precede body reads.")
+
+url_helper = source.split("func isExpectedOAuthUserResponseURL", 1)[-1].split(
+    "\nfunc isOAuthUserJSONResponse", 1
+)[0]
+for item in (
+    'responseURL.Scheme == "https"',
+    "strings.EqualFold(responseURL.Hostname(), oauthUserResponseHost)",
+    "responseURL.User == nil",
+    'responseURL.Port() == ""',
+    "responseURL.EscapedPath() == oauthUserResponsePath",
+    'responseURL.Fragment == ""',
+):
+    if url_helper.count(item) != 1:
+        raise SystemExit("OAuth user response final URL contract was weakened.")
+
+media_helper = source.split("func isOAuthUserJSONResponse", 1)[-1].split(
+    "\n// Process a request and cache", 1
+)[0]
+for item in (
+    'mime.ParseMediaType(response.Header.Get("Content-Type"))',
+    'mediaType == "application/json"',
+    'strings.HasPrefix(mediaType, "application/")',
+    'strings.HasSuffix(mediaType, "+json")',
+):
+    if media_helper.count(item) != 1:
+        raise SystemExit("OAuth user response JSON media-type contract was weakened.")
 
 redirect = source.split("func Redirect", 1)[-1].split("func decodeOAuthUserResponse", 1)[0]
 for item in ("defer p.Body.Close()", "user, err := decodeOAuthUserResponse(p)"):
@@ -265,14 +299,18 @@ for item in ("defer p.Body.Close()", "user, err := decodeOAuthUserResponse(p)"):
 
 required_tests = (
     "TestDecodeOAuthUserResponseRejectsNonSuccessBeforeRead",
+    "TestDecodeOAuthUserResponseRejectsUnexpectedFinalURLBeforeRead",
+    "TestDecodeOAuthUserResponseAcceptsExpectedFinalURL",
+    "TestDecodeOAuthUserResponseRejectsNonJSONBeforeRead",
     "TestDecodeOAuthUserResponseAcceptsExactLimit",
     "TestDecodeOAuthUserResponseRejectsOversizeBody",
     "TestDecodeOAuthUserResponsePreservesReadError",
     "TestDecodeOAuthUserResponseRejectsMalformedPayloads",
-    "body.readCalls != 0",
 )
 if any(tests.count(item) != 1 for item in required_tests):
     raise SystemExit("Focused OAuth user response boundary tests must remain unique.")
+if tests.count("body.readCalls != 0") != 3:
+    raise SystemExit("OAuth response rejection tests must prove bodies remain unread.")
 PY
 
 if ! grep -Fq 'userCacheKeyPrefix        = "user:"' "$ROOT_DIR/auth.go" ||
@@ -789,11 +827,35 @@ if statuses != ["status: completed"] or any(item not in plan for item in require
     raise SystemExit("OAuth user response plan must record completed local verification.")
 PY
 
+python3 - "$OAUTH_USER_ORIGIN_PLAN" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+plan = Path(sys.argv[1]).read_text()
+frontmatter = plan.split("---", 2)[1]
+statuses = re.findall(r"^status: .+$", frontmatter, flags=re.MULTILINE)
+required = (
+    "hostile mutations were rejected",
+    "all four Make gates",
+    "external-directory Make gate",
+    "race detector",
+    "No live OAuth",
+)
+if statuses != ["status: completed"] or any(item not in plan for item in required):
+    raise SystemExit("OAuth user response origin plan must record completed local verification.")
+PY
+
 if ! grep -Fq "OAuth user-profile responses require a 2xx status" "$ROOT_DIR/README.md" ||
   ! grep -Fq "OAuth user-profile responses should reject non-2xx" "$ROOT_DIR/SECURITY.md" ||
   ! grep -Fq "OAuth user-profile responses require 2xx status" "$ROOT_DIR/VISION.md" ||
   ! grep -Fq "over-1-MiB OAuth user-profile responses" "$ROOT_DIR/CHANGES.md" ||
-  ! grep -Fq "Reject non-2xx OAuth user-profile responses" "$ROOT_DIR/AGENTS.md"; then
+  ! grep -Fq "Reject non-2xx OAuth user-profile responses" "$ROOT_DIR/AGENTS.md" ||
+  ! grep -Fq '`api.foursquare.com/v2/users/self` endpoint, and a JSON media type' "$ROOT_DIR/README.md" ||
+  ! grep -Fq "endpoints, and non-JSON media types before body reads" "$ROOT_DIR/SECURITY.md" ||
+  ! grep -Fq "final endpoint and JSON media-type checks" "$ROOT_DIR/VISION.md" ||
+  ! grep -Fq "Foursquare endpoint and a JSON media type before response reads" "$ROOT_DIR/CHANGES.md" ||
+  ! grep -Fq "unexpected final endpoints, and" "$ROOT_DIR/AGENTS.md"; then
   printf '%s\n' "Project docs must preserve OAuth user response boundaries." >&2
   exit 1
 fi

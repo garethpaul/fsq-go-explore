@@ -39,8 +39,9 @@ Current baseline:
   string.
 - OAuth callbacks reject missing OAuth authorization codes before token exchange
   work starts.
-- OAuth user-profile responses require 2xx status and a 1 MiB body boundary
-  before wrapper or user decoding.
+- OAuth user-profile responses require 2xx status, the exact final HTTPS
+  Foursquare user endpoint, and a JSON media type before reads, followed by a
+  1 MiB body boundary before wrapper or user decoding.
 - Auth cookies validate generated user cache keys before access-token memcache
   lookup starts.
 - Protected routes validate generated auth cookie cache keys before handler
@@ -81,6 +82,8 @@ Next priorities:
 - Clarify secret handling for local and hosted environments
 - Keep state-changing handlers method-constrained and covered by tests
 - Keep missing OAuth authorization codes covered before exchange work is added
+- Keep OAuth user-profile final endpoint and JSON media-type checks ahead of
+  response reads
 - Keep user cache keys validated before memcache lookup
 - Keep protected-route auth cookie validation covered before handler work starts
 - Keep ETag matching exact when changing header-cache behavior

@@ -83,14 +83,64 @@ func TestDecodeOAuthUserResponseRejectsNonSuccessBeforeRead(t *testing.T) {
 	}
 }
 
+func TestDecodeOAuthUserResponseRejectsUnexpectedFinalURLBeforeRead(t *testing.T) {
+	for name, responseURL := range map[string]string{
+		"scheme":   "http://api.foursquare.com/v2/users/self",
+		"host":     "https://example.com/v2/users/self",
+		"userinfo": "https://user@api.foursquare.com/v2/users/self",
+		"port":     "https://api.foursquare.com:443/v2/users/self",
+		"path":     "https://api.foursquare.com/v2/users/other",
+		"fragment": "https://api.foursquare.com/v2/users/self#profile",
+	} {
+		t.Run(name, func(t *testing.T) {
+			body := &trackingReadCloser{reader: strings.NewReader(validOAuthUserResponse())}
+			response := oauthUserResponse(http.StatusOK, "application/json", body)
+			response.Request = httptest.NewRequest(http.MethodGet, responseURL, nil)
+
+			_, err := decodeOAuthUserResponse(response)
+			if !errors.Is(err, errOAuthUserResponseOrigin) {
+				t.Fatalf("error = %v, want %v", err, errOAuthUserResponseOrigin)
+			}
+			if body.readCalls != 0 {
+				t.Fatalf("body reads = %d, want zero", body.readCalls)
+			}
+		})
+	}
+}
+
+func TestDecodeOAuthUserResponseAcceptsExpectedFinalURL(t *testing.T) {
+	response := oauthUserResponse(http.StatusOK, "application/json", io.NopCloser(strings.NewReader(validOAuthUserResponse())))
+	response.Request = httptest.NewRequest(http.MethodGet, "https://API.FOURSQUARE.COM/v2/users/self?oauth_token=redacted&v=20170101", nil)
+
+	if _, err := decodeOAuthUserResponse(response); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestDecodeOAuthUserResponseRejectsNonJSONBeforeRead(t *testing.T) {
+	for _, contentType := range []string{"", "text/html", "application/jsonp", "not a media type"} {
+		body := &trackingReadCloser{reader: strings.NewReader(validOAuthUserResponse())}
+		response := oauthUserResponse(http.StatusOK, contentType, body)
+
+		_, err := decodeOAuthUserResponse(response)
+		if !errors.Is(err, errOAuthUserResponseMediaType) {
+			t.Fatalf("content type %q error = %v, want %v", contentType, err, errOAuthUserResponseMediaType)
+		}
+		if body.readCalls != 0 {
+			t.Fatalf("content type %q body reads = %d, want zero", contentType, body.readCalls)
+		}
+	}
+}
+
 func TestDecodeOAuthUserResponseAcceptsExactLimit(t *testing.T) {
 	body := validOAuthUserResponse()
 	body += strings.Repeat(" ", maxOAuthUserResponseBytes-len(body))
 
-	user, err := decodeOAuthUserResponse(&http.Response{
-		StatusCode: http.StatusOK,
-		Body:       io.NopCloser(strings.NewReader(body)),
-	})
+	user, err := decodeOAuthUserResponse(oauthUserResponse(
+		http.StatusOK,
+		"application/problem+json; charset=utf-8",
+		io.NopCloser(strings.NewReader(body)),
+	))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -100,20 +150,22 @@ func TestDecodeOAuthUserResponseAcceptsExactLimit(t *testing.T) {
 }
 
 func TestDecodeOAuthUserResponseRejectsOversizeBody(t *testing.T) {
-	_, err := decodeOAuthUserResponse(&http.Response{
-		StatusCode: http.StatusOK,
-		Body:       io.NopCloser(strings.NewReader(strings.Repeat("x", maxOAuthUserResponseBytes+1))),
-	})
+	_, err := decodeOAuthUserResponse(oauthUserResponse(
+		http.StatusOK,
+		"application/json",
+		io.NopCloser(strings.NewReader(strings.Repeat("x", maxOAuthUserResponseBytes+1))),
+	))
 	if !errors.Is(err, errOAuthUserResponseTooLarge) {
 		t.Fatalf("error = %v, want %v", err, errOAuthUserResponseTooLarge)
 	}
 }
 
 func TestDecodeOAuthUserResponsePreservesReadError(t *testing.T) {
-	_, err := decodeOAuthUserResponse(&http.Response{
-		StatusCode: http.StatusOK,
-		Body:       io.NopCloser(failingOAuthProfileReader{}),
-	})
+	_, err := decodeOAuthUserResponse(oauthUserResponse(
+		http.StatusOK,
+		"application/json",
+		io.NopCloser(failingOAuthProfileReader{}),
+	))
 	if !errors.Is(err, errOAuthProfileRead) {
 		t.Fatalf("error = %v, want %v", err, errOAuthProfileRead)
 	}
@@ -125,10 +177,11 @@ func TestDecodeOAuthUserResponseRejectsMalformedPayloads(t *testing.T) {
 		"user":    `{"response":"invalid"}`,
 	} {
 		t.Run(name, func(t *testing.T) {
-			_, err := decodeOAuthUserResponse(&http.Response{
-				StatusCode: http.StatusOK,
-				Body:       io.NopCloser(strings.NewReader(body)),
-			})
+			_, err := decodeOAuthUserResponse(oauthUserResponse(
+				http.StatusOK,
+				"application/json",
+				io.NopCloser(strings.NewReader(body)),
+			))
 			if err == nil {
 				t.Fatal("error = nil, want malformed JSON rejection")
 			}
@@ -138,6 +191,19 @@ func TestDecodeOAuthUserResponseRejectsMalformedPayloads(t *testing.T) {
 
 func validOAuthUserResponse() string {
 	return fmt.Sprintf(`{"response":{"user":{"id":%q,"firstName":"Example"}}}`, "user-1")
+}
+
+func oauthUserResponse(status int, contentType string, body io.ReadCloser) *http.Response {
+	response := &http.Response{
+		StatusCode: status,
+		Header:     make(http.Header),
+		Body:       body,
+		Request:    httptest.NewRequest(http.MethodGet, "https://api.foursquare.com/v2/users/self", nil),
+	}
+	if contentType != "" {
+		response.Header.Set("Content-Type", contentType)
+	}
+	return response
 }
 
 func TestValidUserCacheKeyAcceptsGeneratedUserKeys(t *testing.T) {

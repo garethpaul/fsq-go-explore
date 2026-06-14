@@ -1,7 +1,7 @@
 ---
 title: OAuth User Response Origin
 date: 2026-06-14
-status: planned
+status: completed
 execution: code
 ---
 
@@ -44,8 +44,26 @@ use that payload to create authenticated application state.
 
 ## Work Completed
 
-Pending implementation.
+- Added exact final-response URL validation for HTTPS,
+  `api.foursquare.com`, absent userinfo/port/fragment, and the exact
+  `/v2/users/self` path.
+- Required JSON or structured-suffix JSON media types before OAuth profile body
+  reads while preserving status-first validation and the existing 1 MiB limit.
+- Added unread-body regressions for unexpected final URLs and media types,
+  accepted-endpoint coverage, a mutation-sensitive baseline contract, and
+  synchronized repository guidance.
 
 ## Verification Completed
 
-Pending implementation and verification.
+- Focused auth tests, uncached all-package tests, the race detector, vet, and
+  module integrity passed.
+- All four Make gates and the external-directory Make gate passed.
+- Eight hostile mutations were rejected across scheme, host, path, guard,
+  media-type, structured-suffix, unread-body-test, and plan-evidence weakening.
+- Formatting, shell syntax, exact diff, generated-artifact, protected
+  dependency/workflow, whitespace, conflict-marker, and changed-line credential
+  audits passed.
+- No live OAuth flow, Foursquare request, App Engine service, or memcache access
+  was performed.
+- The hosted pull-request and security-alert result is recorded against the
+  exact pushed head in the external engineering tracker.

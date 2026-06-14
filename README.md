@@ -97,8 +97,9 @@ HTTPS `api.foursquare.com` operation path before content checks, decoding, or
 successful response disposal; query values remain dynamic and are never logged.
 Foursquare HTTP clients receive a 10-second default end-to-end timeout when
 callers do not provide a positive timeout; explicit positive values are kept.
-OAuth user-profile responses require a 2xx status before reads and are limited
-to 1 MiB before wrapper or user decoding.
+OAuth user-profile responses require a 2xx status, the exact final HTTPS
+`api.foursquare.com/v2/users/self` endpoint, and a JSON media type before reads;
+accepted bodies are limited to 1 MiB before wrapper or user decoding.
 The in-process limiter retains at most 10,000 rate-limiter keys and evicts the
 least recently used key when request-controlled key material reaches that cap.
 Each bucket permits a burst of `Max` requests and refills those `Max` requests
@@ -130,8 +131,9 @@ When the required SDK or runtime is unavailable, use static checks and source re
 - OAuth login uses per-request state values and HTTP-only cookies for callback
   validation.
 - OAuth callbacks with matching state still fail before token exchange; missing OAuth authorization codes are rejected.
-- OAuth user-profile responses reject non-2xx statuses before reads and enforce
-  a 1 MiB body limit before authentication state is created.
+- OAuth user-profile responses reject non-2xx statuses, unexpected final
+  endpoints, and non-JSON media types before reads, then enforce a 1 MiB body
+  limit before authentication state is created.
 - Auth cookie values are validated as generated user cache keys before memcache
   lookup, so malformed cookie values do not reach access-token cache work.
 - Protected routes validate generated auth cookie cache keys before handler
