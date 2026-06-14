@@ -35,11 +35,13 @@ func testResponse(body string) *http.Response {
 }
 
 func testResponseWithStatus(status int, body string) *http.Response {
-	return &http.Response{
+	response := &http.Response{
 		StatusCode: status,
 		Body:       io.NopCloser(strings.NewReader(body)),
 		Header:     make(http.Header),
 	}
+	response.Header.Set("Content-Type", "application/json; charset=utf-8")
+	return response
 }
 
 func TestSuccessfulFoursquareStatusAcceptsOnly2xx(t *testing.T) {
@@ -57,6 +59,53 @@ func TestSuccessfulFoursquareStatusAcceptsOnly2xx(t *testing.T) {
 		if got := successfulFoursquareStatus(tt.status); got != tt.want {
 			t.Errorf("successfulFoursquareStatus(%d) = %t, want %t", tt.status, got, tt.want)
 		}
+	}
+}
+
+func TestFoursquareJSONResponseMediaTypes(t *testing.T) {
+	for _, contentType := range []string{"application/json", "application/json; charset=utf-8", "application/vnd.foursquare+json"} {
+		response := testResponse(`{"response":{}}`)
+		response.Header.Set("Content-Type", contentType)
+		if !isFoursquareJSONResponse(response) {
+			t.Errorf("isFoursquareJSONResponse(%q) = false, want true", contentType)
+		}
+	}
+	for _, contentType := range []string{"", "text/html", "text/json", "application/octet-stream", "not a type"} {
+		response := testResponse(`{"response":{}}`)
+		response.Header.Set("Content-Type", contentType)
+		if isFoursquareJSONResponse(response) {
+			t.Errorf("isFoursquareJSONResponse(%q) = true, want false", contentType)
+		}
+	}
+}
+
+func TestSearchRejectsNonJSONResponseBeforeDecode(t *testing.T) {
+	service := NewFoursquareService(&FoursquareConfig{
+		ClientId: "client-id", ClientSecret: "client-secret", Version: "20260614",
+		Client: http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+			response := testResponse(`{"response":{"venues":[{"id":"must-not-decode"}]}}`)
+			response.Header.Set("Content-Type", "text/html")
+			return response, nil
+		})},
+	})
+	response := service.Search(&VenueSearchRequest{Near: "San Francisco", Query: "coffee"})
+	if len(response.Venues) != 0 {
+		t.Fatalf("Search venues = %#v, want empty result for non-JSON response", response.Venues)
+	}
+}
+
+func TestVenueDetailsRejectsNonJSONResponseBeforeDecode(t *testing.T) {
+	service := NewFoursquareService(&FoursquareConfig{
+		AccessToken: "token", Version: "20260614",
+		Client: http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+			response := testResponse(`{"response":{"venue":{"id":"must-not-decode"}}}`)
+			response.Header.Set("Content-Type", "text/plain")
+			return response, nil
+		})},
+	})
+	response := service.VenueDetails("venue-1")
+	if response.Venue.ID != "" {
+		t.Fatalf("VenueDetails venue ID = %q, want empty result for non-JSON response", response.Venue.ID)
 	}
 }
 
