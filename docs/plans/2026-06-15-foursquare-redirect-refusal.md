@@ -1,7 +1,7 @@
 ---
 title: Foursquare Redirect Refusal
 type: security
-status: in_progress
+status: completed
 date: 2026-06-15
 ---
 
@@ -45,8 +45,28 @@ client credentials or access tokens can be forwarded to another destination.
 
 ## Work Completed
 
-Pending implementation.
+- Added shared `fsq.RefuseRedirect` policy returning
+  `http.ErrUseLastResponse`.
+- Applied the policy to copied Foursquare service clients while retaining
+  caller transports, positive timeouts, and caller configuration ownership.
+- Applied the same policy to the App Engine `urlfetch` client used for OAuth
+  user lookup.
+- Added focused behavior tests, static contracts, and maintained guidance.
 
 ## Verification Completed
 
-Pending implementation and validation.
+- `go test -race -count=1 ./...` and `go vet ./...` passed in an isolated copy
+  of the exact source tree.
+- All four Make gates passed, and the absolute-Makefile check passed from an
+  external directory.
+- The policy removal mutation failed compilation and the structural contract.
+- The redirect acceptance mutation failed focused behavior tests.
+- The service override mutation failed focused behavior tests.
+- The OAuth client override mutation failed the App Engine client contract.
+- The focused test mutation failed the test-presence contract.
+- The plan evidence mutation failed the completed-evidence contract.
+- Formatting, shell syntax, and `git diff --check` passed before final audit.
+- No live Foursquare credentials, API calls, OAuth redirects, or App Engine
+  deployment were exercised.
+- The hosted pull-request check is captured after push and recorded in the
+  exact-head tracker evidence rather than claimed by this pre-push plan.

@@ -50,6 +50,18 @@ func TestNewOAuthStateReturnsDistinctOpaqueValues(t *testing.T) {
 	}
 }
 
+func TestGetHTTPClientRefusesRedirects(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "https://example.com/login", nil)
+	client := getHttpClient(req)
+
+	if client.Transport == nil {
+		t.Fatal("expected App Engine URL fetch transport")
+	}
+	if err := client.CheckRedirect(nil, nil); !errors.Is(err, http.ErrUseLastResponse) {
+		t.Fatalf("redirect policy error = %v, want http.ErrUseLastResponse", err)
+	}
+}
+
 func TestRedirectRejectsMissingAuthorizationCodeBeforeExchange(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/redirect?state=state-1", nil)
 	req.AddCookie(&http.Cookie{Name: oauthStateCookieName, Value: "state-1"})

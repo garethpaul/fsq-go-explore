@@ -29,6 +29,10 @@ const (
 
 var errFoursquareResponseTooLarge = errors.New("foursquare response body exceeds 2 MiB")
 
+func RefuseRedirect(_ *http.Request, _ []*http.Request) error {
+	return http.ErrUseLastResponse
+}
+
 func successfulFoursquareStatus(statusCode int) bool {
 	return statusCode >= http.StatusOK && statusCode < http.StatusMultipleChoices
 }
@@ -90,6 +94,7 @@ func NewFoursquareService(config *FoursquareConfig) *FoursquareService {
 	if client.Timeout <= 0 {
 		client.Timeout = foursquareRequestTimeout
 	}
+	client.CheckRedirect = RefuseRedirect
 	serviceConfig.Client = client
 	return &FoursquareService{Config: &serviceConfig}
 }

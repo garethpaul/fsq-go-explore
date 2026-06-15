@@ -308,5 +308,8 @@ func Logout(w http.ResponseWriter, r *http.Request) {
 }
 
 func getHttpClient(r *http.Request) http.Client {
-	return http.Client{Transport: &urlfetch.Transport{Context: appengine.NewContext(r)}}
+	return http.Client{
+		Transport:     &urlfetch.Transport{Context: appengine.NewContext(r)},
+		CheckRedirect: fsq.RefuseRedirect,
+	}
 }

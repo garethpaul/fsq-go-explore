@@ -231,6 +231,31 @@ func TestNewFoursquareServicePreservesExplicitClientTimeout(t *testing.T) {
 	}
 }
 
+func TestNewFoursquareServiceRefusesRedirects(t *testing.T) {
+	transport := roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		return testResponse(`{"response":{}}`), nil
+	})
+	originalRedirect := func(req *http.Request, via []*http.Request) error { return nil }
+	config := &FoursquareConfig{
+		Client: http.Client{
+			Transport:     transport,
+			Timeout:       3 * time.Second,
+			CheckRedirect: originalRedirect,
+		},
+	}
+
+	service := NewFoursquareService(config)
+	if err := service.Config.Client.CheckRedirect(nil, nil); !errors.Is(err, http.ErrUseLastResponse) {
+		t.Fatalf("service redirect policy error = %v, want http.ErrUseLastResponse", err)
+	}
+	if service.Config.Client.Transport == nil || service.Config.Client.Timeout != 3*time.Second {
+		t.Fatal("service redirect policy must preserve caller transport and timeout")
+	}
+	if err := config.Client.CheckRedirect(nil, nil); err != nil {
+		t.Fatalf("caller redirect policy was mutated: %v", err)
+	}
+}
+
 func TestNewFoursquareServiceDoesNotMutateCallerConfig(t *testing.T) {
 	config := &FoursquareConfig{}
 	service := NewFoursquareService(config)

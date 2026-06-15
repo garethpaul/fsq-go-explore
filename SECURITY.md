@@ -51,6 +51,8 @@ work starts, even when the state cookie matches.
 OAuth user-profile responses should reject non-2xx statuses, unexpected final
 endpoints, and non-JSON media types before body reads and enforce a 1 MiB limit
 before JSON decoding or session creation.
+Foursquare API and OAuth user clients must refuse redirects before
+credential-bearing query parameters can be forwarded to another destination.
 Auth cookies should validate generated user cache keys before memcache lookup so
 malformed cookie values do not reach access-token cache work.
 Protected routes should reject malformed auth-cookie cache keys before handler

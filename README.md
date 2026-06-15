@@ -97,6 +97,8 @@ HTTPS `api.foursquare.com` operation path before content checks, decoding, or
 successful response disposal; query values remain dynamic and are never logged.
 Foursquare HTTP clients receive a 10-second default end-to-end timeout when
 callers do not provide a positive timeout; explicit positive values are kept.
+Foursquare clients refuse redirects before query credentials or access tokens
+can be forwarded to another destination.
 OAuth user-profile responses require a 2xx status, the exact final HTTPS
 `api.foursquare.com/v2/users/self` endpoint, and a JSON media type before reads;
 accepted bodies are limited to 1 MiB before wrapper or user decoding.

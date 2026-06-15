@@ -22,6 +22,7 @@ RESPONSE_STATUS_PLAN="$ROOT_DIR/docs/plans/2026-06-13-fsq-response-status-valida
 CLIENT_TIMEOUT_PLAN="$ROOT_DIR/docs/plans/2026-06-13-foursquare-client-timeout.md"
 OAUTH_USER_RESPONSE_PLAN="$ROOT_DIR/docs/plans/2026-06-13-oauth-user-response-boundary.md"
 OAUTH_USER_ORIGIN_PLAN="$ROOT_DIR/docs/plans/2026-06-14-oauth-user-response-origin.md"
+REDIRECT_REFUSAL_PLAN="$ROOT_DIR/docs/plans/2026-06-15-foursquare-redirect-refusal.md"
 LOCATION_INDEPENDENT_MAKE_PLAN="$ROOT_DIR/docs/plans/2026-06-13-location-independent-make.md"
 RESPONSE_CONTENT_TYPE_PLAN="$ROOT_DIR/docs/plans/2026-06-14-fsq-response-content-type.md"
 VENUE_EDIT_RESPONSE_PLAN="$ROOT_DIR/docs/plans/2026-06-14-fsq-venue-edit-response-boundary.md"
@@ -71,6 +72,7 @@ for path in \
   "docs/plans/2026-06-14-fsq-venue-edit-response-boundary.md" \
   "docs/plans/2026-06-14-fsq-response-final-url-boundary.md" \
   "docs/plans/2026-06-14-oauth-user-response-origin.md" \
+  "docs/plans/2026-06-15-foursquare-redirect-refusal.md" \
   "docs/plans/2026-06-12-fsq-rate-limiter-refill.md" \
   "docs/plans/2026-06-12-fsq-edit-body-limit.md" \
   "docs/plans/2026-06-13-fsq-response-body-limit.md" \
@@ -235,6 +237,29 @@ if ! grep -Fq 'strings.TrimSpace(r.FormValue("code"))' "$ROOT_DIR/auth.go" ||
   printf '%s\n' "OAuth callbacks must reject missing authorization codes before exchange work." >&2
   exit 1
 fi
+
+python3 - "$ROOT_DIR/fsq/api.go" "$ROOT_DIR/fsq/api_test.go" "$ROOT_DIR/auth.go" "$ROOT_DIR/auth_test.go" <<'PY'
+import sys
+from pathlib import Path
+
+api = Path(sys.argv[1]).read_text()
+api_tests = Path(sys.argv[2]).read_text()
+auth = Path(sys.argv[3]).read_text()
+auth_tests = Path(sys.argv[4]).read_text()
+required = (
+    "func RefuseRedirect(_ *http.Request, _ []*http.Request) error",
+    "return http.ErrUseLastResponse",
+    "client.CheckRedirect = RefuseRedirect",
+)
+if any(api.count(item) != 1 for item in required):
+    raise SystemExit("Foursquare service clients must use one shared redirect-refusal policy.")
+if auth.count("CheckRedirect: fsq.RefuseRedirect") != 1:
+    raise SystemExit("OAuth user lookup must use the shared redirect-refusal policy.")
+if api_tests.count("TestNewFoursquareServiceRefusesRedirects") != 1 or api_tests.count("http.ErrUseLastResponse") < 1:
+    raise SystemExit("Foursquare service redirect refusal must retain its focused test.")
+if auth_tests.count("TestGetHTTPClientRefusesRedirects") != 1 or auth_tests.count("http.ErrUseLastResponse") < 1:
+    raise SystemExit("OAuth user client redirect refusal must retain its focused test.")
+PY
 
 python3 - "$ROOT_DIR/auth.go" "$ROOT_DIR/auth_test.go" <<'PY'
 import sys
@@ -845,6 +870,42 @@ required = (
 if statuses != ["status: completed"] or any(item not in plan for item in required):
     raise SystemExit("OAuth user response origin plan must record completed local verification.")
 PY
+
+python3 - "$REDIRECT_REFUSAL_PLAN" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+plan = Path(sys.argv[1]).read_text()
+frontmatter = plan.split("---", 2)[1]
+statuses = re.findall(r"^status: .+$", frontmatter, flags=re.MULTILINE)
+verification = plan.split("## Verification Completed\n", 1)[-1]
+required = (
+    "policy removal mutation failed",
+    "redirect acceptance mutation failed",
+    "service override mutation failed",
+    "OAuth client override mutation failed",
+    "focused test mutation failed",
+    "plan evidence mutation failed",
+    "hosted pull-request check",
+)
+if (
+    statuses != ["status: completed"]
+    or "## Verification Completed\n" not in plan
+    or any(item not in verification for item in required)
+    or re.search(r"\b(?:pending|todo|tbd|not run|not yet)\b", verification, re.IGNORECASE)
+):
+    raise SystemExit("Foursquare redirect refusal plan must remain completed with actual verification recorded.")
+PY
+
+if ! grep -Fq "Foursquare clients refuse redirects before query credentials" "$ROOT_DIR/README.md" ||
+  ! grep -Fq "Foursquare API and OAuth user clients must refuse redirects" "$ROOT_DIR/SECURITY.md" ||
+  ! grep -Fq "Foursquare clients refuse redirects before credential-bearing queries" "$ROOT_DIR/VISION.md" ||
+  ! grep -Fq "Refused redirects for Foursquare API and OAuth user requests" "$ROOT_DIR/CHANGES.md" ||
+  ! grep -Fq "Refuse Foursquare API and OAuth user redirects" "$ROOT_DIR/AGENTS.md"; then
+  printf '%s\n' "Project docs must preserve Foursquare redirect refusal." >&2
+  exit 1
+fi
 
 if ! grep -Fq "OAuth user-profile responses require a 2xx status" "$ROOT_DIR/README.md" ||
   ! grep -Fq "OAuth user-profile responses should reject non-2xx" "$ROOT_DIR/SECURITY.md" ||

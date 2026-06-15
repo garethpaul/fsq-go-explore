@@ -59,6 +59,8 @@
   final HTTPS Foursquare API host and operation path before reads or decoding.
 - Keep the 10-second default Foursquare client timeout conditional, preserve
   explicit positive timeouts, and do not mutate caller-owned configuration.
+- Refuse Foursquare API and OAuth user redirects before credential-bearing
+  query parameters can be forwarded.
 
 ## Agent workflow
 

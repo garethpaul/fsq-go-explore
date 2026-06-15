@@ -1,5 +1,12 @@
 # Changes
 
+## 2026-06-15
+
+- Refused redirects for Foursquare API and OAuth user requests before query
+  credentials or access tokens can be forwarded.
+- Added shared-policy, client-construction, focused-test, documentation,
+  mutation, and completed-evidence contracts.
+
 ## 2026-06-14
 
 - Required OAuth user-profile responses to retain the exact final HTTPS

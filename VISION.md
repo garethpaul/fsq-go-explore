@@ -42,6 +42,8 @@ Current baseline:
 - OAuth user-profile responses require 2xx status, the exact final HTTPS
   Foursquare user endpoint, and a JSON media type before reads, followed by a
   1 MiB body boundary before wrapper or user decoding.
+- Foursquare clients refuse redirects before credential-bearing queries can be
+  forwarded to another destination.
 - Auth cookies validate generated user cache keys before access-token memcache
   lookup starts.
 - Protected routes validate generated auth cookie cache keys before handler
