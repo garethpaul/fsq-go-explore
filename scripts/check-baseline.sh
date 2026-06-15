@@ -24,6 +24,7 @@ OAUTH_USER_RESPONSE_PLAN="$ROOT_DIR/docs/plans/2026-06-13-oauth-user-response-bo
 OAUTH_USER_ORIGIN_PLAN="$ROOT_DIR/docs/plans/2026-06-14-oauth-user-response-origin.md"
 REDIRECT_REFUSAL_PLAN="$ROOT_DIR/docs/plans/2026-06-15-foursquare-redirect-refusal.md"
 OAUTH_USER_TIMEOUT_PLAN="$ROOT_DIR/docs/plans/2026-06-15-oauth-user-request-timeout.md"
+OAUTH_USER_ID_PLAN="$ROOT_DIR/docs/plans/2026-06-15-oauth-user-id-boundary.md"
 LOCATION_INDEPENDENT_MAKE_PLAN="$ROOT_DIR/docs/plans/2026-06-13-location-independent-make.md"
 RESPONSE_CONTENT_TYPE_PLAN="$ROOT_DIR/docs/plans/2026-06-14-fsq-response-content-type.md"
 VENUE_EDIT_RESPONSE_PLAN="$ROOT_DIR/docs/plans/2026-06-14-fsq-venue-edit-response-boundary.md"
@@ -77,6 +78,7 @@ for path in \
   "docs/plans/2026-06-14-oauth-user-response-origin.md" \
   "docs/plans/2026-06-15-foursquare-redirect-refusal.md" \
   "docs/plans/2026-06-15-oauth-user-request-timeout.md" \
+  "docs/plans/2026-06-15-oauth-user-id-boundary.md" \
   "docs/plans/2026-06-12-fsq-rate-limiter-refill.md" \
   "docs/plans/2026-06-12-fsq-edit-body-limit.md" \
   "docs/plans/2026-06-13-fsq-response-body-limit.md" \
@@ -345,6 +347,62 @@ if any(tests.count(item) != 1 for item in required_tests):
     raise SystemExit("Focused OAuth user response boundary tests must remain unique.")
 if tests.count("body.readCalls != 0") != 3:
     raise SystemExit("OAuth response rejection tests must prove bodies remain unread.")
+PY
+
+python3 - "$ROOT_DIR/auth.go" "$ROOT_DIR/auth_test.go" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+source = Path(sys.argv[1]).read_text()
+tests = Path(sys.argv[2]).read_text()
+decoder = source.split("func decodeOAuthUserResponse", 1)[-1].split(
+    "\n// Process a request and cache", 1
+)[0]
+redirect = source.split("func Redirect", 1)[-1].split(
+    "func decodeOAuthUserResponse", 1
+)[0]
+
+if len(re.findall(
+    r'^\s*errOAuthUserResponseIdentity\s+= errors\.New\("foursquare user response identity was invalid"\)$',
+    source,
+    flags=re.MULTILINE,
+)) != 1:
+    raise SystemExit("OAuth user decoding must use one generic invalid-identity error.")
+
+required_decoder = (
+    'user.User.ID == ""',
+    "user.User.ID != strings.TrimSpace(user.User.ID)",
+    "return nil, errOAuthUserResponseIdentity",
+)
+if any(decoder.count(item) != 1 for item in required_decoder):
+    raise SystemExit("OAuth user decoding must reject missing or edge-whitespace IDs.")
+
+decode = decoder.find("json.Unmarshal(wrapper.Response, user)")
+validate = decoder.find('user.User.ID == ""')
+publish = decoder.find("return user, nil")
+if min(decode, validate, publish) < 0 or not decode < validate < publish:
+    raise SystemExit("OAuth user identity validation must precede profile publication.")
+
+decoded_user = redirect.find("user, err := decodeOAuthUserResponse(p)")
+cached_user = redirect.find("newUser := &fsq.FoursquareUser")
+cached_token = redirect.find("setAccessToken(")
+cookie = redirect.rfind("http.SetCookie(")
+if min(decoded_user, cached_user, cached_token, cookie) < 0 or not decoded_user < cached_user < cached_token < cookie:
+    raise SystemExit("OAuth user identity validation must precede cache and cookie publication.")
+
+required_tests = (
+    "TestDecodeOAuthUserResponseRejectsInvalidUserIDs",
+    '"missing"',
+    '"whitespace only"',
+    '"leading whitespace"',
+    '"trailing whitespace"',
+    r'"id":"\u00a0user-1"',
+    "errors.Is(err, errOAuthUserResponseIdentity)",
+    "TestDecodeOAuthUserResponseAllowsEmptyDisplayName",
+)
+if any(tests.count(item) != 1 for item in required_tests):
+    raise SystemExit("OAuth user identity boundary tests must remain complete and unique.")
 PY
 
 if ! grep -Fq 'userCacheKeyPrefix        = "user:"' "$ROOT_DIR/auth.go" ||
@@ -880,6 +938,28 @@ if statuses != ["status: completed"] or any(item not in plan for item in require
     raise SystemExit("OAuth user response origin plan must record completed local verification.")
 PY
 
+python3 - "$OAUTH_USER_ID_PLAN" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+plan = Path(sys.argv[1]).read_text()
+statuses = re.findall(r"^status: .+$", plan, flags=re.MULTILINE)
+verification = plan.split("## Verification Completed\n", 1)[-1]
+required = (
+    "Focused OAuth identity tests passed",
+    "Repository and external-directory Make gates passed",
+    "Eight hostile mutations failed",
+    "No live OAuth callback was executed",
+)
+if (
+    statuses != ["status: completed"]
+    or "## Verification Completed\n" not in plan
+    or any(item not in verification for item in required)
+):
+    raise SystemExit("OAuth user ID boundary plan must record completed verification.")
+PY
+
 python3 - "$REDIRECT_REFUSAL_PLAN" <<'PY'
 import re
 import sys
@@ -922,6 +1002,15 @@ if ! grep -Fq "OAuth user-profile requests use a 10-second end-to-end timeout" "
   ! grep -Fq "Bounded OAuth user-profile requests with a 10-second end-to-end timeout" "$ROOT_DIR/CHANGES.md" ||
   ! grep -Fq "Keep OAuth user-profile requests bounded by a 10-second end-to-end timeout" "$ROOT_DIR/AGENTS.md"; then
   printf '%s\n' "Project docs must preserve the OAuth user request timeout." >&2
+  exit 1
+fi
+
+if ! grep -Fq "OAuth user-profile identities require a nonempty ID without leading or trailing Unicode whitespace" "$ROOT_DIR/README.md" ||
+  ! grep -Fq "OAuth user-profile identities must reject missing, empty, or edge-whitespace IDs before access-token caching or cookie publication" "$ROOT_DIR/SECURITY.md" ||
+  ! grep -Fq "OAuth user-profile identities require canonical nonempty IDs before session publication" "$ROOT_DIR/VISION.md" ||
+  ! grep -Fq "Rejected missing, empty, and edge-whitespace OAuth user IDs before access-token caching or cookie publication" "$ROOT_DIR/CHANGES.md" ||
+  ! grep -Fq "Reject missing, empty, or edge-whitespace OAuth user IDs before access-token caching or cookie publication" "$ROOT_DIR/AGENTS.md"; then
+  printf '%s\n' "Project docs must preserve the OAuth user identity boundary." >&2
   exit 1
 fi
 

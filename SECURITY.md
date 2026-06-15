@@ -55,6 +55,7 @@ Foursquare API and OAuth user clients must refuse redirects before
 credential-bearing query parameters can be forwarded to another destination.
 OAuth user-profile requests must use a 10-second end-to-end timeout in addition
 to redirect refusal and response validation.
+OAuth user-profile identities must reject missing, empty, or edge-whitespace IDs before access-token caching or cookie publication.
 Auth cookies should validate generated user cache keys before memcache lookup so
 malformed cookie values do not reach access-token cache work.
 Protected routes should reject malformed auth-cookie cache keys before handler

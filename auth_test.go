@@ -211,6 +211,49 @@ func TestDecodeOAuthUserResponseRejectsMalformedPayloads(t *testing.T) {
 	}
 }
 
+func TestDecodeOAuthUserResponseRejectsInvalidUserIDs(t *testing.T) {
+	for name, idField := range map[string]string{
+		"missing":             ``,
+		"empty":               `"id":""`,
+		"whitespace only":     `"id":" \t\n"`,
+		"leading whitespace":  `"id":"\u00a0user-1"`,
+		"trailing whitespace": `"id":"user-1 "`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			separator := ""
+			if idField != "" {
+				separator = ","
+			}
+			body := fmt.Sprintf(
+				`{"response":{"user":{%s%s"firstName":"Example"}}}`,
+				idField,
+				separator,
+			)
+			if _, err := decodeOAuthUserResponse(oauthUserResponse(
+				http.StatusOK,
+				"application/json",
+				io.NopCloser(strings.NewReader(body)),
+			)); !errors.Is(err, errOAuthUserResponseIdentity) {
+				t.Fatalf("error = %v, want %v", err, errOAuthUserResponseIdentity)
+			}
+		})
+	}
+}
+
+func TestDecodeOAuthUserResponseAllowsEmptyDisplayName(t *testing.T) {
+	user, err := decodeOAuthUserResponse(oauthUserResponse(
+		http.StatusOK,
+		"application/json",
+		io.NopCloser(strings.NewReader(`{"response":{"user":{"id":"user-1"}}}`)),
+	))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if user.User.ID != "user-1" || user.User.FirstName != "" {
+		t.Fatalf("user = %#v, want canonical ID and empty display name", user.User)
+	}
+}
+
 func validOAuthUserResponse() string {
 	return fmt.Sprintf(`{"response":{"user":{"id":%q,"firstName":"Example"}}}`, "user-1")
 }

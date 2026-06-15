@@ -53,6 +53,7 @@ var (
 	errOAuthUserResponseOrigin    = errors.New("foursquare user response origin was not expected")
 	errOAuthUserResponseMediaType = errors.New("foursquare user response media type was not JSON")
 	errOAuthUserResponseTooLarge  = errors.New("foursquare user response exceeded the size limit")
+	errOAuthUserResponseIdentity  = errors.New("foursquare user response identity was invalid")
 )
 
 func newOAuthState() (string, error) {
@@ -254,6 +255,9 @@ func decodeOAuthUserResponse(response *http.Response) (*fsq.UserResponse, error)
 	user := new(fsq.UserResponse)
 	if err := json.Unmarshal(wrapper.Response, user); err != nil {
 		return nil, err
+	}
+	if user.User.ID == "" || user.User.ID != strings.TrimSpace(user.User.ID) {
+		return nil, errOAuthUserResponseIdentity
 	}
 	return user, nil
 }

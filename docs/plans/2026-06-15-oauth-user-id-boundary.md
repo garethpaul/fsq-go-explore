@@ -1,7 +1,7 @@
 ---
 title: OAuth User ID Boundary
 type: security
-status: in_progress
+status: completed
 date: 2026-06-15
 execution: code
 ---
@@ -83,7 +83,16 @@ Files:
 - Do not execute live Foursquare credentials, OAuth callbacks, App Engine, or
   memcache flows.
 
-## Work Pending
+## Verification Completed
 
-- Implement decoded user-ID validation and focused tests.
-- Add contracts, synchronized guidance, and actual verification evidence.
+- Focused OAuth identity tests passed for five invalid ID forms and the valid
+  empty-display-name case.
+- Repository and external-directory Make gates passed with the full baseline.
+- Eight hostile mutations failed across validation removal, whitespace
+  weakening, publication ordering, regression coverage, guidance, and plan
+  evidence.
+- `go test ./...`, `go test -race ./...`, and `go vet ./...` passed.
+- Diff, artifact, conflict-marker, mode, and changed-line credential audits
+  passed.
+- No live OAuth callback was executed because provider credentials and App
+  Engine services are outside this local verification boundary.

@@ -104,6 +104,8 @@ upstream work cannot hold the callback open indefinitely.
 OAuth user-profile responses require a 2xx status, the exact final HTTPS
 `api.foursquare.com/v2/users/self` endpoint, and a JSON media type before reads;
 accepted bodies are limited to 1 MiB before wrapper or user decoding.
+OAuth user-profile identities require a nonempty ID without leading or trailing Unicode whitespace
+before access-token caching or authentication-cookie publication.
 The in-process limiter retains at most 10,000 rate-limiter keys and evicts the
 least recently used key when request-controlled key material reaches that cap.
 Each bucket permits a burst of `Max` requests and refills those `Max` requests
