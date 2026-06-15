@@ -23,12 +23,14 @@ CLIENT_TIMEOUT_PLAN="$ROOT_DIR/docs/plans/2026-06-13-foursquare-client-timeout.m
 OAUTH_USER_RESPONSE_PLAN="$ROOT_DIR/docs/plans/2026-06-13-oauth-user-response-boundary.md"
 OAUTH_USER_ORIGIN_PLAN="$ROOT_DIR/docs/plans/2026-06-14-oauth-user-response-origin.md"
 REDIRECT_REFUSAL_PLAN="$ROOT_DIR/docs/plans/2026-06-15-foursquare-redirect-refusal.md"
+OAUTH_USER_TIMEOUT_PLAN="$ROOT_DIR/docs/plans/2026-06-15-oauth-user-request-timeout.md"
 LOCATION_INDEPENDENT_MAKE_PLAN="$ROOT_DIR/docs/plans/2026-06-13-location-independent-make.md"
 RESPONSE_CONTENT_TYPE_PLAN="$ROOT_DIR/docs/plans/2026-06-14-fsq-response-content-type.md"
 VENUE_EDIT_RESPONSE_PLAN="$ROOT_DIR/docs/plans/2026-06-14-fsq-venue-edit-response-boundary.md"
 RESPONSE_FINAL_URL_PLAN="$ROOT_DIR/docs/plans/2026-06-14-fsq-response-final-url-boundary.md"
 RESPONSE_CONTENT_TYPE_CHECK="$ROOT_DIR/scripts/check-response-content-type.py"
 RESPONSE_FINAL_URL_CHECK="$ROOT_DIR/scripts/check-response-final-url.py"
+OAUTH_USER_TIMEOUT_CHECK="$ROOT_DIR/scripts/check-oauth-user-timeout.py"
 WORKFLOW="$ROOT_DIR/.github/workflows/check.yml"
 
 require_file() {
@@ -68,11 +70,13 @@ for path in \
   "limiter/config/config_test.go" \
   "scripts/check-response-content-type.py" \
   "scripts/check-response-final-url.py" \
+  "scripts/check-oauth-user-timeout.py" \
   "docs/plans/2026-06-14-fsq-response-content-type.md" \
   "docs/plans/2026-06-14-fsq-venue-edit-response-boundary.md" \
   "docs/plans/2026-06-14-fsq-response-final-url-boundary.md" \
   "docs/plans/2026-06-14-oauth-user-response-origin.md" \
   "docs/plans/2026-06-15-foursquare-redirect-refusal.md" \
+  "docs/plans/2026-06-15-oauth-user-request-timeout.md" \
   "docs/plans/2026-06-12-fsq-rate-limiter-refill.md" \
   "docs/plans/2026-06-12-fsq-edit-body-limit.md" \
   "docs/plans/2026-06-13-fsq-response-body-limit.md" \
@@ -106,6 +110,11 @@ python3 "$RESPONSE_FINAL_URL_CHECK" \
   "$ROOT_DIR/fsq/api.go" \
   "$ROOT_DIR/fsq/api_test.go" \
   "$RESPONSE_FINAL_URL_PLAN"
+
+python3 "$OAUTH_USER_TIMEOUT_CHECK" \
+  "$ROOT_DIR/auth.go" \
+  "$ROOT_DIR/auth_test.go" \
+  "$OAUTH_USER_TIMEOUT_PLAN"
 
 if ! grep -Fq 'ROOT := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))' "$ROOT_DIR/Makefile" ||
   ! grep -Fq '"$(ROOT)/scripts/check-baseline.sh"' "$ROOT_DIR/Makefile"; then
@@ -904,6 +913,15 @@ if ! grep -Fq "Foursquare clients refuse redirects before query credentials" "$R
   ! grep -Fq "Refused redirects for Foursquare API and OAuth user requests" "$ROOT_DIR/CHANGES.md" ||
   ! grep -Fq "Refuse Foursquare API and OAuth user redirects" "$ROOT_DIR/AGENTS.md"; then
   printf '%s\n' "Project docs must preserve Foursquare redirect refusal." >&2
+  exit 1
+fi
+
+if ! grep -Fq "OAuth user-profile requests use a 10-second end-to-end timeout" "$ROOT_DIR/README.md" ||
+  ! grep -Fq "OAuth user-profile requests must use a 10-second end-to-end timeout" "$ROOT_DIR/SECURITY.md" ||
+  ! grep -Fq "OAuth user-profile requests use a 10-second end-to-end timeout" "$ROOT_DIR/VISION.md" ||
+  ! grep -Fq "Bounded OAuth user-profile requests with a 10-second end-to-end timeout" "$ROOT_DIR/CHANGES.md" ||
+  ! grep -Fq "Keep OAuth user-profile requests bounded by a 10-second end-to-end timeout" "$ROOT_DIR/AGENTS.md"; then
+  printf '%s\n' "Project docs must preserve the OAuth user request timeout." >&2
   exit 1
 fi
 

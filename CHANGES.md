@@ -2,6 +2,7 @@
 
 ## 2026-06-15
 
+- Bounded OAuth user-profile requests with a 10-second end-to-end timeout.
 - Refused redirects for Foursquare API and OAuth user requests before query
   credentials or access tokens can be forwarded.
 - Added shared-policy, client-construction, focused-test, documentation,

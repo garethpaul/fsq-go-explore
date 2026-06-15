@@ -43,6 +43,7 @@ var (
 const (
 	userCacheKeyPrefix        = "user:"
 	maxOAuthUserResponseBytes = 1 * 1024 * 1024
+	oauthUserRequestTimeout   = 10 * time.Second
 	oauthUserResponseHost     = "api.foursquare.com"
 	oauthUserResponsePath     = "/v2/users/self"
 )
@@ -311,5 +312,6 @@ func getHttpClient(r *http.Request) http.Client {
 	return http.Client{
 		Transport:     &urlfetch.Transport{Context: appengine.NewContext(r)},
 		CheckRedirect: fsq.RefuseRedirect,
+		Timeout:       oauthUserRequestTimeout,
 	}
 }

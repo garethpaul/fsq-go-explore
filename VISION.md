@@ -44,6 +44,8 @@ Current baseline:
   1 MiB body boundary before wrapper or user decoding.
 - Foursquare clients refuse redirects before credential-bearing queries can be
   forwarded to another destination.
+- OAuth user-profile requests use a 10-second end-to-end timeout so stalled
+  upstream work cannot hold the callback open indefinitely.
 - Auth cookies validate generated user cache keys before access-token memcache
   lookup starts.
 - Protected routes validate generated auth cookie cache keys before handler

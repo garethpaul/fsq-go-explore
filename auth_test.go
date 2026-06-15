@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/garethpaul/fsq-go-explore/fsq"
 )
@@ -59,6 +60,15 @@ func TestGetHTTPClientRefusesRedirects(t *testing.T) {
 	}
 	if err := client.CheckRedirect(nil, nil); !errors.Is(err, http.ErrUseLastResponse) {
 		t.Fatalf("redirect policy error = %v, want http.ErrUseLastResponse", err)
+	}
+}
+
+func TestGetHTTPClientBoundsOAuthUserRequests(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "https://example.com/login", nil)
+	client := getHttpClient(req)
+
+	if client.Timeout != 10*time.Second {
+		t.Fatalf("timeout = %s, want 10s", client.Timeout)
 	}
 }
 

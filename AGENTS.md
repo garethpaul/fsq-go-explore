@@ -50,6 +50,7 @@
 - Reject non-2xx OAuth user-profile responses, unexpected final endpoints, and
   non-JSON media types before reads; cap accepted profile bodies at 1 MiB before
   decoding.
+- Keep OAuth user-profile requests bounded by a 10-second end-to-end timeout.
 - Auth cookie values are validated as generated user cache keys before memcache lookup, so malformed cookie values do not reach access-token cache work.
 - Reject non-2xx Foursquare search and venue detail responses before JSON
   decoding, and keep status logs free of URLs, credentials, tokens, and bodies.

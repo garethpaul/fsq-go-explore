@@ -1,7 +1,7 @@
 ---
 title: OAuth User Request Timeout
 type: security
-status: in_progress
+status: completed
 date: 2026-06-15
 ---
 
@@ -41,8 +41,26 @@ indefinitely.
 
 ## Work Completed
 
-Pending implementation.
+- Added a 10-second end-to-end timeout to the App Engine HTTP client used for
+  OAuth user-profile lookup.
+- Preserved the existing transport, redirect refusal, response validation,
+  cookie, cache, and logging boundaries.
+- Added a focused behavior test, a static contract, maintained guidance, and
+  completed-plan enforcement.
 
 ## Verification Completed
 
-Pending implementation and verification.
+- `go test -race -count=1 ./...` and `go vet ./...` passed.
+- The focused OAuth client timeout and redirect-refusal tests passed.
+- `go mod tidy` left `go.mod` and `go.sum` byte-for-byte unchanged.
+- The timeout removal mutation failed the exact constant contract.
+- The timeout drift mutation failed after changing the value to 30 seconds.
+- The client assignment mutation failed after removing the `Timeout` field.
+- The focused test mutation failed after renaming the required behavior test.
+- The guidance mutation failed after weakening the README boundary statement.
+- The plan evidence mutation failed after removing required mutation evidence.
+- Formatting and shell syntax passed before the full repository gates.
+- No live Foursquare credentials, API calls, OAuth callbacks, or App Engine
+  deployment were exercised.
+- The hosted pull-request check is captured after push and recorded in the
+  exact-head tracker evidence rather than claimed by this pre-push plan.
