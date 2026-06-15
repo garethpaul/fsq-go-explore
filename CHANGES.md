@@ -2,6 +2,8 @@
 
 ## 2026-06-15
 
+- Rejected case-folded duplicate OAuth user-profile JSON members before typed
+  identity decoding.
 - Rejected duplicate OAuth user-profile JSON members before typed identity decoding.
 - Rejected duplicate or combined OAuth user-profile Content-Type metadata before response reads.
 - Rejected missing, empty, and edge-whitespace OAuth user IDs before access-token caching or cookie publication.

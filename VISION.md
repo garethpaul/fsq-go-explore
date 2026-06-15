@@ -48,7 +48,7 @@ Current baseline:
   upstream work cannot hold the callback open indefinitely.
 - OAuth user-profile identities require canonical nonempty IDs before session publication.
 - Reject duplicate OAuth user-profile JSON member names before typed identity
-  decoding and session publication.
+  decoding and session publication, including case-folded aliases.
 - Auth cookies validate generated user cache keys before access-token memcache
   lookup starts.
 - Protected routes validate generated auth cookie cache keys before handler

@@ -1,7 +1,7 @@
 ---
 title: OAuth User Case-Folded JSON Members
 type: security
-status: in_progress
+status: completed
 date: 2026-06-15
 execution: code
 ---
@@ -55,4 +55,27 @@ and still target the same identity field with last-value-wins behavior.
 - Do not contact live Foursquare services or use credentials.
 - Do not merge or close stacked pull requests without owner authorization.
 
-## Status: In Progress
+## Status: Completed
+
+## Work Completed
+
+- Fold every bounded OAuth JSON object member with semantics equivalent to the
+  standard library's `encoding/json` field matching before duplicate tracking.
+- Reject ASCII and Unicode case-folded ambiguity independently in every nested
+  object while preserving exact duplicate rejection and unique unknown fields.
+- Add response, user, identity, array-nested Unicode, source, guidance, and
+  completed-plan contracts.
+
+## Verification Completed
+
+- Focused case-folded duplicate and valid unique-member tests passed.
+- Repository-root and external-directory `make check` passed the complete
+  offline baseline.
+- `go test -race -count=1 ./...` passed.
+- `go vet ./...` passed.
+- Seven isolated hostile mutations were rejected across folded-key tracking,
+  Unicode folding, scanner integration, ASCII and Unicode regression coverage,
+  maintained guidance, and completed-plan evidence.
+- Exact diff, generated-artifact, conflict-marker, and credential-pattern
+  audits passed.
+- No live OAuth callback was executed.

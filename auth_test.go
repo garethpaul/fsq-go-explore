@@ -239,10 +239,14 @@ func TestDecodeOAuthUserResponseRejectsMalformedPayloads(t *testing.T) {
 
 func TestDecodeOAuthUserResponseRejectsDuplicateJSONMembers(t *testing.T) {
 	for name, body := range map[string]string{
-		"response":     `{"response":{"user":{"id":"user-1"}},"response":{"user":{"id":"user-2"}}}`,
-		"user":         `{"response":{"user":{"id":"user-1"},"user":{"id":"user-2"}}}`,
-		"id":           `{"response":{"user":{"id":"user-1","id":"user-2"}}}`,
-		"array object": `{"response":{"user":{"id":"user-1"},"items":[{"value":1,"value":2}]}}`,
+		"response":             `{"response":{"user":{"id":"user-1"}},"response":{"user":{"id":"user-2"}}}`,
+		"user":                 `{"response":{"user":{"id":"user-1"},"user":{"id":"user-2"}}}`,
+		"id":                   `{"response":{"user":{"id":"user-1","id":"user-2"}}}`,
+		"array object":         `{"response":{"user":{"id":"user-1"},"items":[{"value":1,"value":2}]}}`,
+		"case-folded response": `{"response":{"user":{"id":"user-1"}},"Response":{"user":{"id":"user-2"}}}`,
+		"case-folded user":     `{"response":{"user":{"id":"user-1"},"User":{"id":"user-2"}}}`,
+		"case-folded id":       `{"response":{"user":{"id":"user-1","ID":"user-2"}}}`,
+		"Unicode fold":         `{"response":{"user":{"id":"user-1"},"items":[{"K":1,"\u212a":2}]}}`,
 	} {
 		t.Run(name, func(t *testing.T) {
 			_, err := decodeOAuthUserResponse(oauthUserResponse(

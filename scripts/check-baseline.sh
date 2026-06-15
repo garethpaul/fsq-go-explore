@@ -27,6 +27,7 @@ OAUTH_USER_TIMEOUT_PLAN="$ROOT_DIR/docs/plans/2026-06-15-oauth-user-request-time
 OAUTH_USER_ID_PLAN="$ROOT_DIR/docs/plans/2026-06-15-oauth-user-id-boundary.md"
 OAUTH_USER_CONTENT_TYPE_PLAN="$ROOT_DIR/docs/plans/2026-06-15-oauth-user-content-type-cardinality.md"
 OAUTH_USER_DUPLICATE_JSON_PLAN="$ROOT_DIR/docs/plans/2026-06-15-oauth-user-duplicate-json-members.md"
+OAUTH_USER_CASE_FOLDED_JSON_PLAN="$ROOT_DIR/docs/plans/2026-06-15-oauth-user-case-folded-json-members.md"
 LOCATION_INDEPENDENT_MAKE_PLAN="$ROOT_DIR/docs/plans/2026-06-13-location-independent-make.md"
 RESPONSE_CONTENT_TYPE_PLAN="$ROOT_DIR/docs/plans/2026-06-14-fsq-response-content-type.md"
 VENUE_EDIT_RESPONSE_PLAN="$ROOT_DIR/docs/plans/2026-06-14-fsq-venue-edit-response-boundary.md"
@@ -83,6 +84,7 @@ for path in \
   "docs/plans/2026-06-15-oauth-user-id-boundary.md" \
   "docs/plans/2026-06-15-oauth-user-content-type-cardinality.md" \
   "docs/plans/2026-06-15-oauth-user-duplicate-json-members.md" \
+  "docs/plans/2026-06-15-oauth-user-case-folded-json-members.md" \
   "docs/plans/2026-06-12-fsq-rate-limiter-refill.md" \
   "docs/plans/2026-06-12-fsq-edit-body-limit.md" \
   "docs/plans/2026-06-13-fsq-response-body-limit.md" \
@@ -1101,7 +1103,8 @@ source_contracts = (
     'func rejectDuplicateJSONMembers(body []byte) error',
     'decoder.UseNumber()',
     'members := make(map[string]struct{})',
-    'if _, exists := members[key]; exists {',
+    'foldedKey := foldJSONMemberName(key)',
+    'if _, exists := members[foldedKey]; exists {',
     'if err := consumeUniqueJSONValue(decoder, depth+1); err != nil {',
     'if err := rejectDuplicateJSONMembers(body); err != nil {',
 )
@@ -1156,6 +1159,64 @@ required = (
 if statuses != ["status: completed"] or any(item not in plan for item in required):
     raise SystemExit(
         "OAuth duplicate JSON member plan must record completed verification."
+    )
+PY
+
+python3 - "$ROOT_DIR/auth.go" "$ROOT_DIR/auth_test.go" <<'PY'
+import sys
+from pathlib import Path
+
+source = Path(sys.argv[1]).read_text()
+tests = Path(sys.argv[2]).read_text()
+
+source_contracts = (
+    'func foldJSONMemberName(name string) string',
+    'unicode.SimpleFold(r)',
+    'foldedKey := foldJSONMemberName(key)',
+    'if _, exists := members[foldedKey]; exists {',
+    'members[foldedKey] = struct{}{}',
+)
+if any(contract not in source for contract in source_contracts):
+    raise SystemExit("OAuth duplicate-member scanning must match encoding/json case folding.")
+
+test_contracts = (
+    '"case-folded response"',
+    '"case-folded user"',
+    '"case-folded id"',
+    '"Unicode fold"',
+    '\\u212a',
+)
+if any(contract not in tests for contract in test_contracts):
+    raise SystemExit("OAuth duplicate-member regressions must cover ASCII and Unicode case folds.")
+PY
+
+if ! grep -Fq 'including case-folded names' "$ROOT_DIR/README.md" || \
+  ! grep -Fq 'case-folded names' "$ROOT_DIR/SECURITY.md" || \
+  ! grep -Fq 'including case-folded aliases' "$ROOT_DIR/VISION.md" || \
+  ! grep -Fq 'Rejected case-folded duplicate OAuth user-profile JSON members' "$ROOT_DIR/CHANGES.md" || \
+  ! grep -Fq 'including case-folded aliases' "$ROOT_DIR/AGENTS.md"; then
+  printf '%s\n' "Project docs must preserve decoder-aligned OAuth duplicate-member rejection." >&2
+  exit 1
+fi
+
+python3 - "$OAUTH_USER_CASE_FOLDED_JSON_PLAN" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+plan = Path(sys.argv[1]).read_text()
+frontmatter = plan.split("---", 2)[1]
+statuses = re.findall(r"^status: .+$", frontmatter, flags=re.MULTILINE)
+required = (
+    "repository-root and external-directory `make check`",
+    "`go test -race -count=1 ./...` passed",
+    "`go vet ./...` passed",
+    "isolated hostile mutations were rejected",
+    "No live OAuth callback was executed",
+)
+if statuses != ["status: completed"] or any(item not in plan for item in required):
+    raise SystemExit(
+        "OAuth case-folded JSON member plan must record completed verification."
     )
 PY
 

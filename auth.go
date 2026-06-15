@@ -15,6 +15,7 @@ import (
 	"os"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/garethpaul/fsq-go-explore/fsq"
 	"golang.org/x/oauth2"
@@ -283,6 +284,19 @@ func rejectDuplicateJSONMembers(body []byte) error {
 	return nil
 }
 
+// foldJSONMemberName mirrors encoding/json's case-insensitive field matching.
+func foldJSONMemberName(name string) string {
+	return strings.Map(func(r rune) rune {
+		for {
+			folded := unicode.SimpleFold(r)
+			if folded <= r {
+				return folded
+			}
+			r = folded
+		}
+	}, name)
+}
+
 func consumeUniqueJSONValue(decoder *json.Decoder, depth int) error {
 	if depth > 10000 {
 		return errOAuthUserResponseJSONStructure
@@ -309,10 +323,11 @@ func consumeUniqueJSONValue(decoder *json.Decoder, depth int) error {
 			if !ok {
 				return errOAuthUserResponseJSONStructure
 			}
-			if _, exists := members[key]; exists {
+			foldedKey := foldJSONMemberName(key)
+			if _, exists := members[foldedKey]; exists {
 				return errOAuthUserResponseDuplicateKey
 			}
-			members[key] = struct{}{}
+			members[foldedKey] = struct{}{}
 			if err := consumeUniqueJSONValue(decoder, depth+1); err != nil {
 				return err
 			}
