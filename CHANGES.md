@@ -2,6 +2,7 @@
 
 ## 2026-06-15
 
+- Rejected duplicate or combined OAuth user-profile Content-Type metadata before response reads.
 - Rejected missing, empty, and edge-whitespace OAuth user IDs before access-token caching or cookie publication.
 - Bounded OAuth user-profile requests with a 10-second end-to-end timeout.
 - Refused redirects for Foursquare API and OAuth user requests before query

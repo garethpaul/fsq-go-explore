@@ -40,8 +40,8 @@ Current baseline:
 - OAuth callbacks reject missing OAuth authorization codes before token exchange
   work starts.
 - OAuth user-profile responses require 2xx status, the exact final HTTPS
-  Foursquare user endpoint, and a JSON media type before reads, followed by a
-  1 MiB body boundary before wrapper or user decoding.
+  Foursquare user endpoint, and exactly one JSON media-type field before reads,
+  followed by a 1 MiB body boundary before wrapper or user decoding.
 - Foursquare clients refuse redirects before credential-bearing queries can be
   forwarded to another destination.
 - OAuth user-profile requests use a 10-second end-to-end timeout so stalled

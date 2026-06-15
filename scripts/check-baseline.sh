@@ -25,6 +25,7 @@ OAUTH_USER_ORIGIN_PLAN="$ROOT_DIR/docs/plans/2026-06-14-oauth-user-response-orig
 REDIRECT_REFUSAL_PLAN="$ROOT_DIR/docs/plans/2026-06-15-foursquare-redirect-refusal.md"
 OAUTH_USER_TIMEOUT_PLAN="$ROOT_DIR/docs/plans/2026-06-15-oauth-user-request-timeout.md"
 OAUTH_USER_ID_PLAN="$ROOT_DIR/docs/plans/2026-06-15-oauth-user-id-boundary.md"
+OAUTH_USER_CONTENT_TYPE_PLAN="$ROOT_DIR/docs/plans/2026-06-15-oauth-user-content-type-cardinality.md"
 LOCATION_INDEPENDENT_MAKE_PLAN="$ROOT_DIR/docs/plans/2026-06-13-location-independent-make.md"
 RESPONSE_CONTENT_TYPE_PLAN="$ROOT_DIR/docs/plans/2026-06-14-fsq-response-content-type.md"
 VENUE_EDIT_RESPONSE_PLAN="$ROOT_DIR/docs/plans/2026-06-14-fsq-venue-edit-response-boundary.md"
@@ -79,6 +80,7 @@ for path in \
   "docs/plans/2026-06-15-foursquare-redirect-refusal.md" \
   "docs/plans/2026-06-15-oauth-user-request-timeout.md" \
   "docs/plans/2026-06-15-oauth-user-id-boundary.md" \
+  "docs/plans/2026-06-15-oauth-user-content-type-cardinality.md" \
   "docs/plans/2026-06-12-fsq-rate-limiter-refill.md" \
   "docs/plans/2026-06-12-fsq-edit-body-limit.md" \
   "docs/plans/2026-06-13-fsq-response-body-limit.md" \
@@ -320,7 +322,9 @@ media_helper = source.split("func isOAuthUserJSONResponse", 1)[-1].split(
     "\n// Process a request and cache", 1
 )[0]
 for item in (
-    'mime.ParseMediaType(response.Header.Get("Content-Type"))',
+    'contentTypes := response.Header.Values("Content-Type")',
+    'len(contentTypes) != 1',
+    'mime.ParseMediaType(contentTypes[0])',
     'mediaType == "application/json"',
     'strings.HasPrefix(mediaType, "application/")',
     'strings.HasSuffix(mediaType, "+json")',
@@ -345,7 +349,7 @@ required_tests = (
 )
 if any(tests.count(item) != 1 for item in required_tests):
     raise SystemExit("Focused OAuth user response boundary tests must remain unique.")
-if tests.count("body.readCalls != 0") != 3:
+if tests.count("body.readCalls != 0") != 4:
     raise SystemExit("OAuth response rejection tests must prove bodies remain unread.")
 PY
 
@@ -403,6 +407,31 @@ required_tests = (
 )
 if any(tests.count(item) != 1 for item in required_tests):
     raise SystemExit("OAuth user identity boundary tests must remain complete and unique.")
+PY
+
+python3 - "$ROOT_DIR/auth.go" "$ROOT_DIR/auth_test.go" <<'PY'
+import sys
+from pathlib import Path
+
+source = Path(sys.argv[1]).read_text()
+tests = Path(sys.argv[2]).read_text()
+media = source.split("func isOAuthUserJSONResponse", 1)[-1].split("\n}\n", 1)[0]
+required_source = (
+    'contentTypes := response.Header.Values("Content-Type")',
+    "if len(contentTypes) != 1",
+    "mime.ParseMediaType(contentTypes[0])",
+)
+if any(media.count(item) != 1 for item in required_source):
+    raise SystemExit("OAuth user responses must require exactly one Content-Type field.")
+
+required_tests = (
+    "TestDecodeOAuthUserResponseRejectsDuplicateContentTypeBeforeRead",
+    'response.Header.Add("Content-Type", "text/html")',
+    '"application/json, text/html"',
+    "TestDecodeOAuthUserResponseAcceptsSingleStructuredJSONContentType",
+)
+if any(tests.count(item) != 1 for item in required_tests):
+    raise SystemExit("OAuth user Content-Type cardinality tests must remain complete and unique.")
 PY
 
 if ! grep -Fq 'userCacheKeyPrefix        = "user:"' "$ROOT_DIR/auth.go" ||
@@ -960,6 +989,26 @@ if (
     raise SystemExit("OAuth user ID boundary plan must record completed verification.")
 PY
 
+python3 - "$OAUTH_USER_CONTENT_TYPE_PLAN" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+plan = Path(sys.argv[1]).read_text()
+frontmatter = plan.split("---", 2)[1]
+statuses = re.findall(r"^status: .+$", frontmatter, flags=re.MULTILINE)
+required = (
+    "Focused OAuth media-type cardinality tests passed",
+    "Repository and external-directory Make gates passed",
+    "Six hostile mutations failed",
+    "No live OAuth callback was executed",
+)
+if statuses != ["status: completed"] or any(item not in plan for item in required):
+    raise SystemExit(
+        "OAuth user Content-Type cardinality plan must record completed verification."
+    )
+PY
+
 python3 - "$REDIRECT_REFUSAL_PLAN" <<'PY'
 import re
 import sys
@@ -1019,12 +1068,21 @@ if ! grep -Fq "OAuth user-profile responses require a 2xx status" "$ROOT_DIR/REA
   ! grep -Fq "OAuth user-profile responses require 2xx status" "$ROOT_DIR/VISION.md" ||
   ! grep -Fq "over-1-MiB OAuth user-profile responses" "$ROOT_DIR/CHANGES.md" ||
   ! grep -Fq "Reject non-2xx OAuth user-profile responses" "$ROOT_DIR/AGENTS.md" ||
-  ! grep -Fq '`api.foursquare.com/v2/users/self` endpoint, and a JSON media type' "$ROOT_DIR/README.md" ||
+  ! grep -Fq '`api.foursquare.com/v2/users/self` endpoint, and exactly one JSON media-type' "$ROOT_DIR/README.md" ||
   ! grep -Fq "endpoints, and non-JSON media types before body reads" "$ROOT_DIR/SECURITY.md" ||
   ! grep -Fq "final endpoint and JSON media-type checks" "$ROOT_DIR/VISION.md" ||
   ! grep -Fq "Foursquare endpoint and a JSON media type before response reads" "$ROOT_DIR/CHANGES.md" ||
   ! grep -Fq "unexpected final endpoints, and" "$ROOT_DIR/AGENTS.md"; then
   printf '%s\n' "Project docs must preserve OAuth user response boundaries." >&2
+  exit 1
+fi
+
+if ! grep -Fq 'exactly one JSON media-type' "$ROOT_DIR/README.md" ||
+  ! grep -Fq 'exactly one JSON `Content-Type` field' "$ROOT_DIR/SECURITY.md" ||
+  ! grep -Fq 'exactly one JSON media-type field' "$ROOT_DIR/VISION.md" ||
+  ! grep -Fq 'Rejected duplicate or combined OAuth user-profile Content-Type metadata' "$ROOT_DIR/CHANGES.md" ||
+  ! grep -Fq 'Require exactly one OAuth user-profile `Content-Type` field' "$ROOT_DIR/AGENTS.md"; then
+  printf '%s\n' "Project docs must preserve OAuth user Content-Type cardinality." >&2
   exit 1
 fi
 

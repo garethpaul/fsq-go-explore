@@ -1,7 +1,7 @@
 ---
 title: OAuth User Content-Type Cardinality
 type: security
-status: planned
+status: completed
 date: 2026-06-15
 execution: code
 ---
@@ -50,3 +50,24 @@ identity.
   media types, identity validation, caching, or cookie publication.
 - Do not contact live Foursquare services or use credentials.
 - Do not merge or close stacked pull requests without owner authorization.
+
+## Status: Completed
+
+## Work Completed
+
+- Required exactly one OAuth user-profile `Content-Type` field before media
+  parsing or response-body reads.
+- Rejected duplicate and comma-combined metadata while preserving one
+  structured `application/*+json` field.
+- Added source, regression, guidance, and completed-plan baseline contracts.
+
+## Verification Completed
+
+- Focused OAuth media-type cardinality tests passed after the duplicate-field
+  regression failed against the prior implementation.
+- Repository and external-directory Make gates passed.
+- `go test -race -count=1 ./...` and `go vet ./...` passed.
+- Six hostile mutations failed for field cardinality, indexed parsing,
+  duplicate coverage, combined coverage, guidance, and plan evidence.
+- Exact diff, generated-artifact, conflict-marker, and secret-pattern audits passed.
+- No live OAuth callback was executed.

@@ -140,7 +140,7 @@ func TestDecodeOAuthUserResponseAcceptsExpectedFinalURL(t *testing.T) {
 }
 
 func TestDecodeOAuthUserResponseRejectsNonJSONBeforeRead(t *testing.T) {
-	for _, contentType := range []string{"", "text/html", "application/jsonp", "not a media type"} {
+	for _, contentType := range []string{"", "text/html", "application/jsonp", "application/json, text/html", "not a media type"} {
 		body := &trackingReadCloser{reader: strings.NewReader(validOAuthUserResponse())}
 		response := oauthUserResponse(http.StatusOK, contentType, body)
 
@@ -151,6 +151,32 @@ func TestDecodeOAuthUserResponseRejectsNonJSONBeforeRead(t *testing.T) {
 		if body.readCalls != 0 {
 			t.Fatalf("content type %q body reads = %d, want zero", contentType, body.readCalls)
 		}
+	}
+}
+
+func TestDecodeOAuthUserResponseRejectsDuplicateContentTypeBeforeRead(t *testing.T) {
+	body := &trackingReadCloser{reader: strings.NewReader(validOAuthUserResponse())}
+	response := oauthUserResponse(http.StatusOK, "application/json", body)
+	response.Header.Add("Content-Type", "text/html")
+
+	_, err := decodeOAuthUserResponse(response)
+	if !errors.Is(err, errOAuthUserResponseMediaType) {
+		t.Fatalf("error = %v, want %v", err, errOAuthUserResponseMediaType)
+	}
+	if body.readCalls != 0 {
+		t.Fatalf("body reads = %d, want zero", body.readCalls)
+	}
+}
+
+func TestDecodeOAuthUserResponseAcceptsSingleStructuredJSONContentType(t *testing.T) {
+	response := oauthUserResponse(
+		http.StatusOK,
+		"application/problem+json; charset=utf-8",
+		io.NopCloser(strings.NewReader(validOAuthUserResponse())),
+	)
+
+	if _, err := decodeOAuthUserResponse(response); err != nil {
+		t.Fatal(err)
 	}
 }
 

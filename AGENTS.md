@@ -50,6 +50,7 @@
 - Reject non-2xx OAuth user-profile responses, unexpected final endpoints, and
   non-JSON media types before reads; cap accepted profile bodies at 1 MiB before
   decoding.
+- Require exactly one OAuth user-profile `Content-Type` field before reads.
 - Keep OAuth user-profile requests bounded by a 10-second end-to-end timeout.
 - Reject missing, empty, or edge-whitespace OAuth user IDs before access-token caching or cookie publication.
 - Auth cookie values are validated as generated user cache keys before memcache lookup, so malformed cookie values do not reach access-token cache work.
