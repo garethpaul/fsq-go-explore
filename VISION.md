@@ -47,6 +47,8 @@ Current baseline:
 - OAuth user-profile requests use a 10-second end-to-end timeout so stalled
   upstream work cannot hold the callback open indefinitely.
 - OAuth user-profile identities require canonical nonempty IDs before session publication.
+- Reject duplicate OAuth user-profile JSON member names before typed identity
+  decoding and session publication.
 - Auth cookies validate generated user cache keys before access-token memcache
   lookup starts.
 - Protected routes validate generated auth cookie cache keys before handler

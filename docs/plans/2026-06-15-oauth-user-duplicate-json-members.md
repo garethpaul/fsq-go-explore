@@ -1,7 +1,7 @@
 ---
 title: OAuth User Duplicate JSON Members
 type: security
-status: planned
+status: completed
 date: 2026-06-15
 execution: code
 ---
@@ -53,3 +53,32 @@ cached and published in the session cookie.
   types.
 - Do not contact live Foursquare services or use credentials.
 - Do not merge or close stacked pull requests without owner authorization.
+
+## Status: Completed
+
+## Work Completed
+
+- Scan each bounded OAuth user-profile body with a number-preserving JSON token
+  decoder before typed unmarshalling.
+- Track member names independently for every object, including objects nested
+  through arrays, and reject the first duplicate with a stable error.
+- Preserve valid unknown unique fields and the existing typed response and
+  identity validation behavior.
+- Add nested duplicate, valid-array, source, guidance, and completed-plan
+  contracts.
+
+## Verification Completed
+
+- The focused test failed before implementation because the duplicate-member
+  contract did not exist, then passed for duplicate `response`, `user`, `id`,
+  and array-nested object members after the scanner was added.
+- Repository-root and external-directory `make check` passed the complete
+  offline baseline.
+- `go test -race -count=1 ./...` passed.
+- `go vet ./...` passed.
+- Seven isolated hostile mutations were rejected for scanner invocation,
+  per-object member tracking, nested recursion, response/user/id regression
+  coverage, maintained guidance, and completed-plan evidence.
+- Exact diff, generated-artifact, conflict-marker, and credential-pattern
+  audits passed.
+- No live OAuth callback was executed.

@@ -2,6 +2,7 @@
 package app
 
 import (
+	"bytes"
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
@@ -49,11 +50,13 @@ const (
 )
 
 var (
-	errOAuthUserResponseStatus    = errors.New("foursquare user response status was not successful")
-	errOAuthUserResponseOrigin    = errors.New("foursquare user response origin was not expected")
-	errOAuthUserResponseMediaType = errors.New("foursquare user response media type was not JSON")
-	errOAuthUserResponseTooLarge  = errors.New("foursquare user response exceeded the size limit")
-	errOAuthUserResponseIdentity  = errors.New("foursquare user response identity was invalid")
+	errOAuthUserResponseStatus        = errors.New("foursquare user response status was not successful")
+	errOAuthUserResponseOrigin        = errors.New("foursquare user response origin was not expected")
+	errOAuthUserResponseMediaType     = errors.New("foursquare user response media type was not JSON")
+	errOAuthUserResponseTooLarge      = errors.New("foursquare user response exceeded the size limit")
+	errOAuthUserResponseIdentity      = errors.New("foursquare user response identity was invalid")
+	errOAuthUserResponseDuplicateKey  = errors.New("foursquare user response contained a duplicate JSON member")
+	errOAuthUserResponseJSONStructure = errors.New("foursquare user response JSON structure was invalid")
 )
 
 func newOAuthState() (string, error) {
@@ -247,6 +250,9 @@ func decodeOAuthUserResponse(response *http.Response) (*fsq.UserResponse, error)
 	if len(body) > maxOAuthUserResponseBytes {
 		return nil, errOAuthUserResponseTooLarge
 	}
+	if err := rejectDuplicateJSONMembers(body); err != nil {
+		return nil, err
+	}
 
 	wrapper := new(fsq.Response)
 	if err := json.Unmarshal(body, wrapper); err != nil {
@@ -260,6 +266,82 @@ func decodeOAuthUserResponse(response *http.Response) (*fsq.UserResponse, error)
 		return nil, errOAuthUserResponseIdentity
 	}
 	return user, nil
+}
+
+func rejectDuplicateJSONMembers(body []byte) error {
+	decoder := json.NewDecoder(bytes.NewReader(body))
+	decoder.UseNumber()
+	if err := consumeUniqueJSONValue(decoder, 0); err != nil {
+		return err
+	}
+	if _, err := decoder.Token(); err != io.EOF {
+		if err == nil {
+			return errOAuthUserResponseJSONStructure
+		}
+		return err
+	}
+	return nil
+}
+
+func consumeUniqueJSONValue(decoder *json.Decoder, depth int) error {
+	if depth > 10000 {
+		return errOAuthUserResponseJSONStructure
+	}
+
+	token, err := decoder.Token()
+	if err != nil {
+		return err
+	}
+	delimiter, ok := token.(json.Delim)
+	if !ok {
+		return nil
+	}
+
+	switch delimiter {
+	case '{':
+		members := make(map[string]struct{})
+		for decoder.More() {
+			keyToken, err := decoder.Token()
+			if err != nil {
+				return err
+			}
+			key, ok := keyToken.(string)
+			if !ok {
+				return errOAuthUserResponseJSONStructure
+			}
+			if _, exists := members[key]; exists {
+				return errOAuthUserResponseDuplicateKey
+			}
+			members[key] = struct{}{}
+			if err := consumeUniqueJSONValue(decoder, depth+1); err != nil {
+				return err
+			}
+		}
+		closing, err := decoder.Token()
+		if err != nil {
+			return err
+		}
+		if closing != json.Delim('}') {
+			return errOAuthUserResponseJSONStructure
+		}
+	case '[':
+		for decoder.More() {
+			if err := consumeUniqueJSONValue(decoder, depth+1); err != nil {
+				return err
+			}
+		}
+		closing, err := decoder.Token()
+		if err != nil {
+			return err
+		}
+		if closing != json.Delim(']') {
+			return errOAuthUserResponseJSONStructure
+		}
+	default:
+		return errOAuthUserResponseJSONStructure
+	}
+
+	return nil
 }
 
 func isExpectedOAuthUserResponseURL(response *http.Response) bool {

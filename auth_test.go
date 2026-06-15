@@ -237,6 +237,42 @@ func TestDecodeOAuthUserResponseRejectsMalformedPayloads(t *testing.T) {
 	}
 }
 
+func TestDecodeOAuthUserResponseRejectsDuplicateJSONMembers(t *testing.T) {
+	for name, body := range map[string]string{
+		"response":     `{"response":{"user":{"id":"user-1"}},"response":{"user":{"id":"user-2"}}}`,
+		"user":         `{"response":{"user":{"id":"user-1"},"user":{"id":"user-2"}}}`,
+		"id":           `{"response":{"user":{"id":"user-1","id":"user-2"}}}`,
+		"array object": `{"response":{"user":{"id":"user-1"},"items":[{"value":1,"value":2}]}}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, err := decodeOAuthUserResponse(oauthUserResponse(
+				http.StatusOK,
+				"application/json",
+				io.NopCloser(strings.NewReader(body)),
+			))
+			if !errors.Is(err, errOAuthUserResponseDuplicateKey) {
+				t.Fatalf("error = %v, want %v", err, errOAuthUserResponseDuplicateKey)
+			}
+		})
+	}
+}
+
+func TestDecodeOAuthUserResponseAcceptsUniqueUnknownNestedMembers(t *testing.T) {
+	user, err := decodeOAuthUserResponse(oauthUserResponse(
+		http.StatusOK,
+		"application/json",
+		io.NopCloser(strings.NewReader(
+			`{"response":{"user":{"id":"user-1"},"items":[{"value":1},{"value":2}]}}`,
+		)),
+	))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if user.User.ID != "user-1" {
+		t.Fatalf("user ID = %q, want user-1", user.User.ID)
+	}
+}
+
 func TestDecodeOAuthUserResponseRejectsInvalidUserIDs(t *testing.T) {
 	for name, idField := range map[string]string{
 		"missing":             ``,

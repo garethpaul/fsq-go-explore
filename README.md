@@ -107,6 +107,8 @@ field before reads; accepted bodies are limited to 1 MiB before wrapper or user
 decoding.
 OAuth user-profile identities require a nonempty ID without leading or trailing Unicode whitespace
 before access-token caching or authentication-cookie publication.
+OAuth user-profile JSON rejects duplicate object member names at every nesting
+level before typed identity decoding.
 The in-process limiter retains at most 10,000 rate-limiter keys and evicts the
 least recently used key when request-controlled key material reaches that cap.
 Each bucket permits a burst of `Max` requests and refills those `Max` requests

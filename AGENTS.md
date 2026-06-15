@@ -53,6 +53,8 @@
 - Require exactly one OAuth user-profile `Content-Type` field before reads.
 - Keep OAuth user-profile requests bounded by a 10-second end-to-end timeout.
 - Reject missing, empty, or edge-whitespace OAuth user IDs before access-token caching or cookie publication.
+- Reject duplicate OAuth user-profile JSON member names at every object nesting
+  level before typed decoding, access-token caching, or cookie publication.
 - Auth cookie values are validated as generated user cache keys before memcache lookup, so malformed cookie values do not reach access-token cache work.
 - Reject non-2xx Foursquare search and venue detail responses before JSON
   decoding, and keep status logs free of URLs, credentials, tokens, and bodies.

@@ -26,6 +26,7 @@ REDIRECT_REFUSAL_PLAN="$ROOT_DIR/docs/plans/2026-06-15-foursquare-redirect-refus
 OAUTH_USER_TIMEOUT_PLAN="$ROOT_DIR/docs/plans/2026-06-15-oauth-user-request-timeout.md"
 OAUTH_USER_ID_PLAN="$ROOT_DIR/docs/plans/2026-06-15-oauth-user-id-boundary.md"
 OAUTH_USER_CONTENT_TYPE_PLAN="$ROOT_DIR/docs/plans/2026-06-15-oauth-user-content-type-cardinality.md"
+OAUTH_USER_DUPLICATE_JSON_PLAN="$ROOT_DIR/docs/plans/2026-06-15-oauth-user-duplicate-json-members.md"
 LOCATION_INDEPENDENT_MAKE_PLAN="$ROOT_DIR/docs/plans/2026-06-13-location-independent-make.md"
 RESPONSE_CONTENT_TYPE_PLAN="$ROOT_DIR/docs/plans/2026-06-14-fsq-response-content-type.md"
 VENUE_EDIT_RESPONSE_PLAN="$ROOT_DIR/docs/plans/2026-06-14-fsq-venue-edit-response-boundary.md"
@@ -81,6 +82,7 @@ for path in \
   "docs/plans/2026-06-15-oauth-user-request-timeout.md" \
   "docs/plans/2026-06-15-oauth-user-id-boundary.md" \
   "docs/plans/2026-06-15-oauth-user-content-type-cardinality.md" \
+  "docs/plans/2026-06-15-oauth-user-duplicate-json-members.md" \
   "docs/plans/2026-06-12-fsq-rate-limiter-refill.md" \
   "docs/plans/2026-06-12-fsq-edit-body-limit.md" \
   "docs/plans/2026-06-13-fsq-response-body-limit.md" \
@@ -1085,5 +1087,76 @@ if ! grep -Fq 'exactly one JSON media-type' "$ROOT_DIR/README.md" ||
   printf '%s\n' "Project docs must preserve OAuth user Content-Type cardinality." >&2
   exit 1
 fi
+
+python3 - "$ROOT_DIR/auth.go" "$ROOT_DIR/auth_test.go" <<'PY'
+import sys
+from pathlib import Path
+
+source = Path(sys.argv[1]).read_text()
+tests = Path(sys.argv[2]).read_text()
+
+source_contracts = (
+    "errOAuthUserResponseDuplicateKey",
+    'errors.New("foursquare user response contained a duplicate JSON member")',
+    'func rejectDuplicateJSONMembers(body []byte) error',
+    'decoder.UseNumber()',
+    'members := make(map[string]struct{})',
+    'if _, exists := members[key]; exists {',
+    'if err := consumeUniqueJSONValue(decoder, depth+1); err != nil {',
+    'if err := rejectDuplicateJSONMembers(body); err != nil {',
+)
+if any(contract not in source for contract in source_contracts):
+    raise SystemExit("OAuth user JSON decoding must reject duplicate nested members.")
+if source.count("consumeUniqueJSONValue(decoder, depth+1)") != 2:
+    raise SystemExit("OAuth duplicate-member scanning must recurse through objects and arrays.")
+
+decode = source[source.index("func decodeOAuthUserResponse("):source.index("func rejectDuplicateJSONMembers(")]
+duplicate_check = decode.find("rejectDuplicateJSONMembers(body)")
+typed_decode = decode.find("json.Unmarshal(body, wrapper)")
+if duplicate_check < 0 or typed_decode < 0 or duplicate_check >= typed_decode:
+    raise SystemExit("OAuth duplicate-member validation must precede typed identity decoding.")
+
+test_contracts = (
+    "TestDecodeOAuthUserResponseRejectsDuplicateJSONMembers",
+    '\"response\":{\"user\":{\"id\":\"user-1\"}},\"response\":',
+    '\"user\":{\"id\":\"user-1\"},\"user\":',
+    '\"id\":\"user-1\",\"id\":\"user-2\"',
+    '\"value\":1,\"value\":2',
+    "errors.Is(err, errOAuthUserResponseDuplicateKey)",
+    "TestDecodeOAuthUserResponseAcceptsUniqueUnknownNestedMembers",
+)
+if any(contract not in tests for contract in test_contracts):
+    raise SystemExit("OAuth duplicate-member regressions must cover response, user, and identity fields.")
+PY
+
+if ! grep -Fq 'rejects duplicate object member names at every nesting' "$ROOT_DIR/README.md" || \
+  ! grep -Fq 'reject duplicate member names before' "$ROOT_DIR/SECURITY.md" || \
+  ! grep -Fq 'Reject duplicate OAuth user-profile JSON member names' "$ROOT_DIR/VISION.md" || \
+  ! grep -Fq 'Rejected duplicate OAuth user-profile JSON members' "$ROOT_DIR/CHANGES.md" || \
+  ! grep -Fq 'Reject duplicate OAuth user-profile JSON member names at every object nesting' "$ROOT_DIR/AGENTS.md"; then
+  printf '%s\n' "Project docs must preserve OAuth duplicate JSON member rejection." >&2
+  exit 1
+fi
+
+python3 - "$OAUTH_USER_DUPLICATE_JSON_PLAN" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+plan = Path(sys.argv[1]).read_text()
+frontmatter = plan.split("---", 2)[1]
+statuses = re.findall(r"^status: .+$", frontmatter, flags=re.MULTILINE)
+required = (
+    "repository-root and external-directory `make check`",
+    "`go test -race -count=1 ./...` passed",
+    "`go vet ./...` passed",
+    "Seven isolated hostile mutations were rejected",
+    "No live OAuth callback was executed",
+)
+if statuses != ["status: completed"] or any(item not in plan for item in required):
+    raise SystemExit(
+        "OAuth duplicate JSON member plan must record completed verification."
+    )
+PY
 
 printf '%s\n' "fsq-go-explore Go baseline checks passed."
