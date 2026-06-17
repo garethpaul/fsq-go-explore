@@ -2,6 +2,8 @@
 
 ## 2026-06-17
 
+- Rejected malformed UTF-8 Foursquare venue and search response bodies before
+  JSON envelope decoding.
 - Rejected malformed UTF-8 OAuth user-profile bodies before JSON parsing and
   session identity publication.
 

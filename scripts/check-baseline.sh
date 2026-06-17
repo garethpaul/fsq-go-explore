@@ -29,6 +29,7 @@ OAUTH_USER_CONTENT_TYPE_PLAN="$ROOT_DIR/docs/plans/2026-06-15-oauth-user-content
 OAUTH_USER_DUPLICATE_JSON_PLAN="$ROOT_DIR/docs/plans/2026-06-15-oauth-user-duplicate-json-members.md"
 OAUTH_USER_CASE_FOLDED_JSON_PLAN="$ROOT_DIR/docs/plans/2026-06-15-oauth-user-case-folded-json-members.md"
 OAUTH_USER_VALID_UTF8_PLAN="$ROOT_DIR/docs/plans/2026-06-17-oauth-user-valid-utf8.md"
+API_VALID_UTF8_PLAN="$ROOT_DIR/docs/plans/2026-06-17-001-fix-foursquare-api-valid-utf8-plan.md"
 LOCATION_INDEPENDENT_MAKE_PLAN="$ROOT_DIR/docs/plans/2026-06-13-location-independent-make.md"
 RESPONSE_CONTENT_TYPE_PLAN="$ROOT_DIR/docs/plans/2026-06-14-fsq-response-content-type.md"
 VENUE_EDIT_RESPONSE_PLAN="$ROOT_DIR/docs/plans/2026-06-14-fsq-venue-edit-response-boundary.md"
@@ -87,6 +88,7 @@ for path in \
   "docs/plans/2026-06-15-oauth-user-duplicate-json-members.md" \
   "docs/plans/2026-06-15-oauth-user-case-folded-json-members.md" \
   "docs/plans/2026-06-17-oauth-user-valid-utf8.md" \
+  "docs/plans/2026-06-17-001-fix-foursquare-api-valid-utf8-plan.md" \
   "docs/plans/2026-06-12-fsq-rate-limiter-refill.md" \
   "docs/plans/2026-06-12-fsq-edit-body-limit.md" \
   "docs/plans/2026-06-13-fsq-response-body-limit.md" \
@@ -154,7 +156,8 @@ from pathlib import Path
 source = Path(sys.argv[1]).read_text()
 tests = Path(sys.argv[2]).read_text()
 decoder = source.split("func decodeFoursquareResponse", 1)[-1]
-decoder_tests = tests.split("func TestDecodeFoursquareResponseAcceptsExactLimit", 1)[-1]
+oversize_test = tests.split("func TestDecodeFoursquareResponseRejectsOversizeBody", 1)[-1].split("\n}\n", 1)[0]
+read_error_test = tests.split("func TestDecodeFoursquareResponsePreservesReadError", 1)[-1].split("\n}\n", 1)[0]
 source_contracts = (
     "io.ReadAll(io.LimitReader(body, maxFoursquareResponseBytes+1))",
     "if len(data) > maxFoursquareResponseBytes",
@@ -174,13 +177,12 @@ if source.count("maxFoursquareResponseBytes = 2 * 1024 * 1024") != 1 or source.c
     raise SystemExit("Foursquare response decoding must keep one exact 2 MiB parse boundary.")
 if any(tests.count(item) != 1 for item in test_contracts):
     raise SystemExit("Foursquare response parsing must keep exact-limit, oversize, and read-error tests.")
-for item in (
-    "maxFoursquareResponseBytes+1",
-    "errors.Is(err, errFoursquareResponseTooLarge)",
-    "errors.Is(err, errTestReadFailure)",
+if (
+    "maxFoursquareResponseBytes+1" not in oversize_test
+    or "errors.Is(err, errFoursquareResponseTooLarge)" not in oversize_test
+    or "errors.Is(err, errTestReadFailure)" not in read_error_test
 ):
-    if decoder_tests.count(item) != 1:
-        raise SystemExit("Foursquare response parsing tests must preserve the decoder-specific boundary assertions.")
+    raise SystemExit("Foursquare response parsing tests must preserve the decoder-specific boundary assertions.")
 if "io.ReadAll(body)" in source:
     raise SystemExit("Foursquare response decoding must not read an unbounded body.")
 PY
@@ -1284,6 +1286,68 @@ if statuses != ["status: completed"] or any(item not in plan for item in require
     raise SystemExit(
         "OAuth case-folded JSON member plan must record completed verification."
     )
+PY
+
+python3 - "$ROOT_DIR/fsq/api.go" "$ROOT_DIR/fsq/api_test.go" <<'PY'
+import sys
+from pathlib import Path
+
+source = Path(sys.argv[1]).read_text()
+tests = Path(sys.argv[2]).read_text()
+
+source_contracts = (
+    '"unicode/utf8"',
+    'errFoursquareResponseInvalidUTF8',
+    'errors.New("foursquare response body was not valid UTF-8")',
+    'if !utf8.Valid(data) {',
+    'return errFoursquareResponseInvalidUTF8',
+)
+if any(contract not in source for contract in source_contracts):
+    raise SystemExit("Foursquare API responses must reject malformed UTF-8 before JSON decoding.")
+
+decode = source[source.index("func decodeFoursquareResponse"):]
+size_check = decode.find("len(data) > maxFoursquareResponseBytes")
+utf8_check = decode.find("utf8.Valid(data)")
+envelope_decode = decode.find("json.Unmarshal(data, response)")
+if min(size_check, utf8_check, envelope_decode) < 0 or not size_check < utf8_check < envelope_decode:
+    raise SystemExit("Foursquare API response size and UTF-8 checks must precede envelope decoding.")
+
+test_contracts = (
+    "TestDecodeFoursquareResponseRejectsInvalidUTF8",
+    'name: "venue value"',
+    'name: "member name"',
+    "errors.Is(err, errFoursquareResponseInvalidUTF8)",
+    "TestDecodeFoursquareResponseAcceptsValidUnicode",
+    '"Café 東京"',
+    "TestDecodeFoursquareResponsePrefersTooLargeOverInvalidUTF8",
+)
+if any(contract not in tests for contract in test_contracts):
+    raise SystemExit("Foursquare API UTF-8 regressions must cover malformed values, names, valid Unicode, and size precedence.")
+PY
+
+if ! grep -Fq 'valid UTF-8 before envelope' "$ROOT_DIR/README.md" || \
+  ! grep -Fq 'valid UTF-8 before envelope' "$ROOT_DIR/SECURITY.md" || \
+  ! grep -Fq 'Reject malformed UTF-8 Foursquare JSON response bodies' "$ROOT_DIR/VISION.md" || \
+  ! grep -Fq 'Rejected malformed UTF-8 Foursquare venue and search response bodies' "$ROOT_DIR/CHANGES.md" || \
+  ! grep -Fq 'Reject malformed UTF-8 Foursquare venue/search response bodies' "$ROOT_DIR/AGENTS.md"; then
+  printf '%s\n' "Project docs must preserve Foursquare API response UTF-8 rejection." >&2
+  exit 1
+fi
+
+python3 - "$API_VALID_UTF8_PLAN" <<'PY'
+import sys
+from pathlib import Path
+
+plan = Path(sys.argv[1]).read_text()
+required = (
+    "R1. General Foursquare JSON bodies must be valid UTF-8",
+    "KTD2. Keep the existing size-limit precedence",
+    "Reject malformed bytes inside a venue value",
+    "moving it after unmarshal",
+    "No live Foursquare request",
+)
+if any(item not in plan for item in required):
+    raise SystemExit("Foursquare API UTF-8 plan must preserve requirements, ordering, regressions, and scope evidence.")
 PY
 
 printf '%s\n' "fsq-go-explore Go baseline checks passed."

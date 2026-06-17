@@ -88,6 +88,9 @@ handler code.
 Foursquare JSON response bodies are limited to 2 MiB before envelope or venue
 decoding so an unexpectedly large upstream response cannot grow process memory
 without an application boundary.
+Bounded Foursquare JSON response bodies must also be valid UTF-8 before envelope
+decoding so malformed provider bytes cannot become replacement characters in
+venue names, addresses, or other rendered text.
 Non-2xx Foursquare search and venue detail responses are rejected before JSON decoding,
 so error envelopes cannot populate successful venue result structures.
 Venue edit responses require 2xx status before a bounded 2 MiB discard, so

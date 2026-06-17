@@ -74,6 +74,9 @@ Rate-limiter buckets should refill `Max` requests over `TTL`, and non-positive
 rate configurations should fail closed instead of disabling throttling.
 Foursquare JSON response bodies must remain limited to 2 MiB before parsing;
 oversized or failed reads should not reach JSON unmarshalling.
+Bounded Foursquare JSON response bodies must be valid UTF-8 before envelope
+decoding so malformed upstream text fails closed instead of being normalized
+into replacement characters.
 Non-2xx Foursquare search and venue detail responses must not reach JSON decoding;
 status failures should log only the numeric status and return empty results.
 Venue edit responses must reject non-2xx status before body reads and bound

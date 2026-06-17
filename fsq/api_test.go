@@ -1,6 +1,7 @@
 package fsq
 
 import (
+	"bytes"
 	"errors"
 	"io"
 	"net/http"
@@ -445,5 +446,55 @@ func TestDecodeFoursquareResponseRejectsEmptyBody(t *testing.T) {
 func TestDecodeFoursquareResponseRejectsMalformedJSON(t *testing.T) {
 	if err := decodeFoursquareResponse(strings.NewReader(`{"response":`), &VenueSearchResponse{}); err == nil {
 		t.Fatal("decodeFoursquareResponse malformed JSON error = nil, want JSON decode error")
+	}
+}
+
+func TestDecodeFoursquareResponseRejectsInvalidUTF8(t *testing.T) {
+	tests := []struct {
+		name string
+		body []byte
+	}{
+		{
+			name: "venue value",
+			body: []byte("{\"response\":{\"venues\":[{\"name\":\"\xff\"}]}}"),
+		},
+		{
+			name: "member name",
+			body: []byte("{\"response\":{\"venues\":[{\"na\xffme\":\"Cafe\"}]}}"),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			err := decodeFoursquareResponse(bytes.NewReader(test.body), &VenueSearchResponse{})
+			if !errors.Is(err, errFoursquareResponseInvalidUTF8) {
+				t.Fatalf("decodeFoursquareResponse error = %v, want %v", err, errFoursquareResponseInvalidUTF8)
+			}
+		})
+	}
+}
+
+func TestDecodeFoursquareResponseAcceptsValidUnicode(t *testing.T) {
+	body := `{"response":{"venues":[{"name":"Café 東京"}]}}`
+	target := new(VenueSearchResponse)
+
+	if err := decodeFoursquareResponse(strings.NewReader(body), target); err != nil {
+		t.Fatalf("decodeFoursquareResponse valid Unicode: %v", err)
+	}
+	if len(target.Venues) != 1 {
+		t.Fatalf("venue count = %d, want 1", len(target.Venues))
+	}
+	if got := target.Venues[0].Name; got != "Café 東京" {
+		t.Fatalf("venue name = %q, want valid Unicode preserved", got)
+	}
+}
+
+func TestDecodeFoursquareResponsePrefersTooLargeOverInvalidUTF8(t *testing.T) {
+	body := bytes.Repeat([]byte{' '}, maxFoursquareResponseBytes+1)
+	body[len(body)-1] = 0xff
+
+	err := decodeFoursquareResponse(bytes.NewReader(body), &VenueSearchResponse{})
+	if !errors.Is(err, errFoursquareResponseTooLarge) {
+		t.Fatalf("decodeFoursquareResponse error = %v, want %v", err, errFoursquareResponseTooLarge)
 	}
 }
