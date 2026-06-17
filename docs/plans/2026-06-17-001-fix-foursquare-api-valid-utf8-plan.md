@@ -2,6 +2,7 @@
 title: "fix: Reject malformed Foursquare API UTF-8"
 type: fix
 date: 2026-06-17
+status: completed
 ---
 
 # fix: Reject malformed Foursquare API UTF-8
@@ -89,3 +90,17 @@ or other text to page and edit consumers.
   fail-closed behavior.
 - Local tests use synthetic responses and do not prove current provider output;
   hosted checks remain authoritative for exact-head integration evidence.
+
+## Verification Completed
+
+- `go test -race -count=1 ./...`, `go vet ./...`, and `go mod tidy -diff`
+  passed.
+- `make check`, `make lint`, `make test`, and `make build` passed from the
+  repository root, and `make check` passed from an external directory.
+- Five isolated hostile mutations were rejected across validation presence,
+  ordering, malformed value/member-name regressions, and completed-plan
+  evidence.
+- Push run `27685041221` and pull-request run `27685069673` passed at
+  implementation commit `5660b6fa515fdaef1d99cf2e838a9015cfbcc62c`.
+- Diff, generated-artifact, conflict-marker, and changed-line secret audits
+  passed. No live Foursquare request or credential-bearing flow was executed.

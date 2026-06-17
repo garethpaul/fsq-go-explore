@@ -1338,16 +1338,22 @@ python3 - "$API_VALID_UTF8_PLAN" <<'PY'
 import sys
 from pathlib import Path
 
-plan = Path(sys.argv[1]).read_text()
+plan = " ".join(Path(sys.argv[1]).read_text().split())
 required = (
+    "status: completed",
     "R1. General Foursquare JSON bodies must be valid UTF-8",
     "KTD2. Keep the existing size-limit precedence",
     "Reject malformed bytes inside a venue value",
     "moving it after unmarshal",
+    "`go test -race -count=1 ./...`, `go vet ./...`, and `go mod tidy -diff` passed",
+    "Five isolated hostile mutations were rejected",
+    "Push run `27685041221`",
+    "pull-request run `27685069673`",
+    "`5660b6fa515fdaef1d99cf2e838a9015cfbcc62c`",
     "No live Foursquare request",
 )
 if any(item not in plan for item in required):
-    raise SystemExit("Foursquare API UTF-8 plan must preserve requirements, ordering, regressions, and scope evidence.")
+    raise SystemExit("Foursquare API UTF-8 plan must preserve requirements and completed exact-head verification evidence.")
 PY
 
 printf '%s\n' "fsq-go-explore Go baseline checks passed."
