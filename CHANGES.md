@@ -1,5 +1,10 @@
 # Changes
 
+## 2026-06-17
+
+- Rejected malformed UTF-8 OAuth user-profile bodies before JSON parsing and
+  session identity publication.
+
 ## 2026-06-15
 
 - Rejected case-folded duplicate OAuth user-profile JSON members before typed

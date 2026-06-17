@@ -1,8 +1,16 @@
+---
+title: OAuth User Response UTF-8 Integrity
+type: security
+status: completed
+date: 2026-06-17
+execution: code
+---
+
 # OAuth User Response UTF-8 Integrity
 
 ## Status
 
-Planned.
+Completed.
 
 ## Problem
 
@@ -48,3 +56,26 @@ publication.
   by `encoding/json`; valid UTF-8 JSON behavior remains unchanged.
 - Live OAuth exchange and credential-bearing Foursquare requests remain outside
   local verification.
+
+## Work Completed
+
+- Added a dedicated malformed-UTF-8 response error and rejected invalid raw
+  bytes after the 1 MiB size boundary but before duplicate-member scanning or
+  typed decoding.
+- Added malformed identity-value and member-name regressions plus a valid
+  Unicode identity control.
+- Added mutation-sensitive source, ordering, test, guidance, and completed-plan
+  contracts to the maintained baseline.
+
+## Verification Completed
+
+- Focused UTF-8 response tests passed.
+- `go test -race -count=1 ./...` passed.
+- `go vet ./...` passed.
+- The repository-root and external-directory `make check` gates passed.
+- Five isolated hostile mutations were rejected across the raw UTF-8 check,
+  validation order, malformed-value regression, malformed-member regression,
+  and completed-plan evidence.
+- `gofmt`, module-integrity, diff, generated-artifact, and changed-line
+  credential-pattern audits passed.
+- No live OAuth callback was executed and no credentials were used.

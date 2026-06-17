@@ -16,6 +16,7 @@ import (
 	"strings"
 	"time"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/garethpaul/fsq-go-explore/fsq"
 	"golang.org/x/oauth2"
@@ -56,6 +57,7 @@ var (
 	errOAuthUserResponseMediaType     = errors.New("foursquare user response media type was not JSON")
 	errOAuthUserResponseTooLarge      = errors.New("foursquare user response exceeded the size limit")
 	errOAuthUserResponseIdentity      = errors.New("foursquare user response identity was invalid")
+	errOAuthUserResponseInvalidUTF8   = errors.New("foursquare user response was not valid UTF-8")
 	errOAuthUserResponseDuplicateKey  = errors.New("foursquare user response contained a duplicate JSON member")
 	errOAuthUserResponseJSONStructure = errors.New("foursquare user response JSON structure was invalid")
 )
@@ -250,6 +252,9 @@ func decodeOAuthUserResponse(response *http.Response) (*fsq.UserResponse, error)
 	}
 	if len(body) > maxOAuthUserResponseBytes {
 		return nil, errOAuthUserResponseTooLarge
+	}
+	if !utf8.Valid(body) {
+		return nil, errOAuthUserResponseInvalidUTF8
 	}
 	if err := rejectDuplicateJSONMembers(body); err != nil {
 		return nil, err

@@ -1,6 +1,7 @@
 package app
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -216,6 +217,43 @@ func TestDecodeOAuthUserResponsePreservesReadError(t *testing.T) {
 	))
 	if !errors.Is(err, errOAuthProfileRead) {
 		t.Fatalf("error = %v, want %v", err, errOAuthProfileRead)
+	}
+}
+
+func TestDecodeOAuthUserResponseRejectsInvalidUTF8(t *testing.T) {
+	invalidID := append([]byte(`{"response":{"user":{"id":"`), 0xff)
+	invalidID = append(invalidID, []byte(`"}}}`)...)
+	invalidMember := append([]byte(`{"response":{"user":{"id":"user-1"},"`), 0xff)
+	invalidMember = append(invalidMember, []byte(`":true}}`)...)
+
+	for name, body := range map[string][]byte{
+		"identity value": invalidID,
+		"member name":    invalidMember,
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, err := decodeOAuthUserResponse(oauthUserResponse(
+				http.StatusOK,
+				"application/json",
+				io.NopCloser(bytes.NewReader(body)),
+			))
+			if !errors.Is(err, errOAuthUserResponseInvalidUTF8) {
+				t.Fatalf("error = %v, want %v", err, errOAuthUserResponseInvalidUTF8)
+			}
+		})
+	}
+}
+
+func TestDecodeOAuthUserResponseAcceptsValidUnicodeIdentity(t *testing.T) {
+	user, err := decodeOAuthUserResponse(oauthUserResponse(
+		http.StatusOK,
+		"application/json",
+		io.NopCloser(strings.NewReader(`{"response":{"user":{"id":"用户-1"}}}`)),
+	))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if user.User.ID != "用户-1" {
+		t.Fatalf("user ID = %q, want %q", user.User.ID, "用户-1")
 	}
 }
 

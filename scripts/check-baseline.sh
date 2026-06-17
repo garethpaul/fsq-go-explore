@@ -28,6 +28,7 @@ OAUTH_USER_ID_PLAN="$ROOT_DIR/docs/plans/2026-06-15-oauth-user-id-boundary.md"
 OAUTH_USER_CONTENT_TYPE_PLAN="$ROOT_DIR/docs/plans/2026-06-15-oauth-user-content-type-cardinality.md"
 OAUTH_USER_DUPLICATE_JSON_PLAN="$ROOT_DIR/docs/plans/2026-06-15-oauth-user-duplicate-json-members.md"
 OAUTH_USER_CASE_FOLDED_JSON_PLAN="$ROOT_DIR/docs/plans/2026-06-15-oauth-user-case-folded-json-members.md"
+OAUTH_USER_VALID_UTF8_PLAN="$ROOT_DIR/docs/plans/2026-06-17-oauth-user-valid-utf8.md"
 LOCATION_INDEPENDENT_MAKE_PLAN="$ROOT_DIR/docs/plans/2026-06-13-location-independent-make.md"
 RESPONSE_CONTENT_TYPE_PLAN="$ROOT_DIR/docs/plans/2026-06-14-fsq-response-content-type.md"
 VENUE_EDIT_RESPONSE_PLAN="$ROOT_DIR/docs/plans/2026-06-14-fsq-venue-edit-response-boundary.md"
@@ -85,6 +86,7 @@ for path in \
   "docs/plans/2026-06-15-oauth-user-content-type-cardinality.md" \
   "docs/plans/2026-06-15-oauth-user-duplicate-json-members.md" \
   "docs/plans/2026-06-15-oauth-user-case-folded-json-members.md" \
+  "docs/plans/2026-06-17-oauth-user-valid-utf8.md" \
   "docs/plans/2026-06-12-fsq-rate-limiter-refill.md" \
   "docs/plans/2026-06-12-fsq-edit-body-limit.md" \
   "docs/plans/2026-06-13-fsq-response-body-limit.md" \
@@ -1089,6 +1091,70 @@ if ! grep -Fq 'exactly one JSON media-type' "$ROOT_DIR/README.md" ||
   printf '%s\n' "Project docs must preserve OAuth user Content-Type cardinality." >&2
   exit 1
 fi
+
+python3 - "$ROOT_DIR/auth.go" "$ROOT_DIR/auth_test.go" <<'PY'
+import sys
+from pathlib import Path
+
+source = Path(sys.argv[1]).read_text()
+tests = Path(sys.argv[2]).read_text()
+
+source_contracts = (
+    '"unicode/utf8"',
+    "errOAuthUserResponseInvalidUTF8",
+    'errors.New("foursquare user response was not valid UTF-8")',
+    "if !utf8.Valid(body) {",
+    "return nil, errOAuthUserResponseInvalidUTF8",
+)
+if any(contract not in source for contract in source_contracts):
+    raise SystemExit("OAuth user responses must reject malformed UTF-8 before JSON decoding.")
+
+decode = source[source.index("func decodeOAuthUserResponse("):source.index("func rejectDuplicateJSONMembers(")]
+size_check = decode.find("len(body) > maxOAuthUserResponseBytes")
+utf8_check = decode.find("utf8.Valid(body)")
+duplicate_check = decode.find("rejectDuplicateJSONMembers(body)")
+typed_decode = decode.find("json.Unmarshal(body, wrapper)")
+if not (0 <= size_check < utf8_check < duplicate_check < typed_decode):
+    raise SystemExit("OAuth UTF-8 validation must follow the size bound and precede JSON parsing.")
+
+test_contracts = (
+    "TestDecodeOAuthUserResponseRejectsInvalidUTF8",
+    '"identity value"',
+    '"member name"',
+    "errors.Is(err, errOAuthUserResponseInvalidUTF8)",
+    "TestDecodeOAuthUserResponseAcceptsValidUnicodeIdentity",
+)
+if any(contract not in tests for contract in test_contracts):
+    raise SystemExit("OAuth UTF-8 tests must cover malformed values, member names, and valid Unicode.")
+PY
+
+if ! grep -Fq 'valid UTF-8 before JSON tokenization' "$ROOT_DIR/README.md" || \
+  ! grep -Fq 'valid UTF-8 before duplicate-member scanning' "$ROOT_DIR/SECURITY.md" || \
+  ! grep -Fq 'Reject malformed UTF-8 OAuth user-profile bodies' "$ROOT_DIR/VISION.md" || \
+  ! grep -Fq 'Rejected malformed UTF-8 OAuth user-profile bodies' "$ROOT_DIR/CHANGES.md" || \
+  ! grep -Fq 'Reject malformed UTF-8 OAuth user-profile bodies' "$ROOT_DIR/AGENTS.md"; then
+  printf '%s\n' "Project docs must preserve OAuth user response UTF-8 validation." >&2
+  exit 1
+fi
+
+python3 - "$OAUTH_USER_VALID_UTF8_PLAN" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+plan = Path(sys.argv[1]).read_text()
+frontmatter = plan.split("---", 2)[1]
+statuses = re.findall(r"^status: .+$", frontmatter, flags=re.MULTILINE)
+required = (
+    "repository-root and external-directory `make check`",
+    "`go test -race -count=1 ./...` passed",
+    "`go vet ./...` passed",
+    "Five isolated hostile mutations were rejected",
+    "No live OAuth callback was executed",
+)
+if statuses != ["status: completed"] or any(item not in plan for item in required):
+    raise SystemExit("OAuth UTF-8 plan must record completed verification.")
+PY
 
 python3 - "$ROOT_DIR/auth.go" "$ROOT_DIR/auth_test.go" <<'PY'
 import sys

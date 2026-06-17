@@ -61,6 +61,8 @@ OAuth user-profile identities must reject missing, empty, or edge-whitespace IDs
 OAuth user-profile JSON objects must reject duplicate member names before typed
 identity decoding, access-token caching, or cookie publication, including
 case-folded names that Go maps to the same typed field.
+OAuth user-profile bodies must be valid UTF-8 before duplicate-member scanning
+or typed decoding so invalid provider bytes cannot become cached identities.
 Auth cookies should validate generated user cache keys before memcache lookup so
 malformed cookie values do not reach access-token cache work.
 Protected routes should reject malformed auth-cookie cache keys before handler

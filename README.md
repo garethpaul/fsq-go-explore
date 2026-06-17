@@ -110,6 +110,8 @@ before access-token caching or authentication-cookie publication.
 OAuth user-profile JSON rejects duplicate object member names at every nesting
 level before typed identity decoding, including case-folded names that Go maps
 to the same typed field.
+Bounded OAuth user-profile bodies must be valid UTF-8 before JSON tokenization,
+so malformed provider bytes cannot be repaired into session identity data.
 The in-process limiter retains at most 10,000 rate-limiter keys and evicts the
 least recently used key when request-controlled key material reaches that cap.
 Each bucket permits a burst of `Max` requests and refills those `Max` requests

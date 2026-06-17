@@ -56,6 +56,8 @@
 - Reject duplicate OAuth user-profile JSON member names at every object nesting
   level before typed decoding, access-token caching, or cookie publication,
   including case-folded aliases that map to the same Go field.
+- Reject malformed UTF-8 OAuth user-profile bodies before JSON parsing,
+  access-token caching, or cookie publication.
 - Auth cookie values are validated as generated user cache keys before memcache lookup, so malformed cookie values do not reach access-token cache work.
 - Reject non-2xx Foursquare search and venue detail responses before JSON
   decoding, and keep status logs free of URLs, credentials, tokens, and bodies.

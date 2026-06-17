@@ -49,6 +49,8 @@ Current baseline:
 - OAuth user-profile identities require canonical nonempty IDs before session publication.
 - Reject duplicate OAuth user-profile JSON member names before typed identity
   decoding and session publication, including case-folded aliases.
+- Reject malformed UTF-8 OAuth user-profile bodies before JSON parsing or
+  session publication.
 - Auth cookies validate generated user cache keys before access-token memcache
   lookup starts.
 - Protected routes validate generated auth cookie cache keys before handler
