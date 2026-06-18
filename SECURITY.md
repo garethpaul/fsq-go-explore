@@ -92,6 +92,10 @@ caller-owned configuration.
 
 Dependency updates should come from trusted package managers and should keep lockfiles in sync when lockfiles exist. Do not commit credentials, private keys, tokens, generated secrets, or machine-local configuration. If a vulnerability depends on a compromised package, typosquatting risk, insecure transitive dependency, or unsafe build step, include the package name, affected version, and the path through which it is used.
 
+Build and test this repository with Go 1.25.11 or newer. Earlier Go 1.25
+patch releases retain reachable standard-library vulnerabilities in template,
+TLS, X.509, HTTP/2, URL, form, and MIME-header paths used by this application.
+
 ## Safe Research Guidelines
 
 Good-faith research is welcome when it stays within these boundaries:

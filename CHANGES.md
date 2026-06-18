@@ -1,5 +1,11 @@
 # Changes
 
+## 2026-06-18
+
+- Raised the maintained Go toolchain to 1.25.11 to incorporate standard-library
+  fixes for reachable template, TLS, X.509, HTTP/2, URL, form, and MIME-header
+  vulnerabilities.
+
 ## 2026-06-17
 
 - Rejected malformed UTF-8 Foursquare venue and search response bodies before

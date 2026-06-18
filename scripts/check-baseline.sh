@@ -30,6 +30,7 @@ OAUTH_USER_DUPLICATE_JSON_PLAN="$ROOT_DIR/docs/plans/2026-06-15-oauth-user-dupli
 OAUTH_USER_CASE_FOLDED_JSON_PLAN="$ROOT_DIR/docs/plans/2026-06-15-oauth-user-case-folded-json-members.md"
 OAUTH_USER_VALID_UTF8_PLAN="$ROOT_DIR/docs/plans/2026-06-17-oauth-user-valid-utf8.md"
 API_VALID_UTF8_PLAN="$ROOT_DIR/docs/plans/2026-06-17-001-fix-foursquare-api-valid-utf8-plan.md"
+GO_SECURITY_PLAN="$ROOT_DIR/docs/plans/2026-06-18-go-1-25-11-security-refresh.md"
 LOCATION_INDEPENDENT_MAKE_PLAN="$ROOT_DIR/docs/plans/2026-06-13-location-independent-make.md"
 RESPONSE_CONTENT_TYPE_PLAN="$ROOT_DIR/docs/plans/2026-06-14-fsq-response-content-type.md"
 VENUE_EDIT_RESPONSE_PLAN="$ROOT_DIR/docs/plans/2026-06-14-fsq-venue-edit-response-boundary.md"
@@ -89,6 +90,7 @@ for path in \
   "docs/plans/2026-06-15-oauth-user-case-folded-json-members.md" \
   "docs/plans/2026-06-17-oauth-user-valid-utf8.md" \
   "docs/plans/2026-06-17-001-fix-foursquare-api-valid-utf8-plan.md" \
+  "docs/plans/2026-06-18-go-1-25-11-security-refresh.md" \
   "docs/plans/2026-06-12-fsq-rate-limiter-refill.md" \
   "docs/plans/2026-06-12-fsq-edit-body-limit.md" \
   "docs/plans/2026-06-13-fsq-response-body-limit.md" \
@@ -220,6 +222,23 @@ if any(item not in tests for item in required_tests):
 PY
 
 if command -v go >/dev/null 2>&1; then
+  python3 - "$ROOT_DIR/go.mod" "$(cd "$ROOT_DIR" && go env GOVERSION)" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+go_mod_path, runtime = sys.argv[1:]
+match = re.search(r"^go ([0-9]+\.[0-9]+\.[0-9]+)$", Path(go_mod_path).read_text(), re.MULTILINE)
+if match is None or match.group(1) != "1.25.11":
+    raise SystemExit("go.mod must require the patched Go 1.25.11 toolchain")
+
+runtime_match = re.fullmatch(r"go([0-9]+)\.([0-9]+)(?:\.([0-9]+))?", runtime)
+if runtime_match is None:
+    raise SystemExit("Unable to parse Go runtime version: " + runtime)
+runtime_version = tuple(int(value or 0) for value in runtime_match.groups())
+if runtime_version < (1, 25, 11):
+    raise SystemExit("Go 1.25.11 or newer is required for standard-library security fixes")
+PY
   unformatted=$(find "$ROOT_DIR" -name '*.go' -not -path "$ROOT_DIR/.git/*" -print | xargs gofmt -l)
   if [ -n "$unformatted" ]; then
     printf '%s\n' "Go files need gofmt:" >&2
@@ -655,6 +674,13 @@ if ! grep -Fq "Malformed venue edit forms should be rejected" "$ROOT_DIR/SECURIT
   ! grep -Fq "least-recently-used" "$ROOT_DIR/SECURITY.md" ||
   ! grep -Fq 'refill `Max` requests over `TTL`' "$ROOT_DIR/SECURITY.md"; then
   printf '%s\n' "SECURITY must document the malformed venue edit form boundary." >&2
+  exit 1
+fi
+
+if ! grep -Fq "Go 1.25.11 or newer" "$ROOT_DIR/README.md" || \
+  ! grep -Fq "Build and test this repository with Go 1.25.11 or newer" "$ROOT_DIR/SECURITY.md" || \
+  ! grep -Fq "Use Go 1.25.11 or newer" "$ROOT_DIR/AGENTS.md"; then
+  printf '%s\n' "Project guidance must retain the patched Go toolchain boundary." >&2
   exit 1
 fi
 
@@ -1354,6 +1380,23 @@ required = (
 )
 if any(item not in plan for item in required):
     raise SystemExit("Foursquare API UTF-8 plan must preserve requirements and completed exact-head verification evidence.")
+PY
+
+python3 - "$GO_SECURITY_PLAN" <<'PY'
+import sys
+from pathlib import Path
+
+plan = " ".join(Path(sys.argv[1]).read_text().split())
+required = (
+    "status: completed",
+    "Go 1.25.11",
+    "18 reachable vulnerabilities",
+    "`go test -race -count=1 ./...`",
+    "`govulncheck` reported no reachable vulnerabilities",
+    "Four isolated hostile mutations were rejected",
+)
+if any(item not in plan for item in required):
+    raise SystemExit("Go security plan must preserve completed local and vulnerability verification evidence.")
 PY
 
 printf '%s\n' "fsq-go-explore Go baseline checks passed."

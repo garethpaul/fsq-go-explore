@@ -35,7 +35,7 @@ Additional scan context:
 ### Prerequisites
 
 - Git
-- Go 1.25 or a compatible modern Go toolchain
+- Go 1.25.11 or newer, including the maintained standard-library security fixes
 
 ### Setup
 

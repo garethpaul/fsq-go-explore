@@ -2,7 +2,7 @@
 title: Refresh the Go toolchain to 1.25.11
 type: security
 date: 2026-06-18
-status: planned
+status: completed
 execution: code
 ---
 
@@ -75,3 +75,16 @@ Verification:
   with the patched toolchain.
 - Push and pull-request checks pass on the exact implementation head.
 - The plan retains truthful local and hosted verification evidence.
+
+## Verification Completed
+
+- Go 1.25.11 ran `go test -race -count=1 ./...`, `go vet ./...`, and
+  `go mod tidy -diff` successfully without changing module requirements or
+  sums.
+- `govulncheck` reported no reachable vulnerabilities with the patched
+  toolchain; the pre-change Go 1.25.3 scan reported 18 reachable
+  standard-library vulnerabilities.
+- Repository-root and external-directory `make check` passed under Go 1.25.11.
+- Four isolated hostile mutations were rejected across the declared toolchain
+  floor, actual runtime floor, completed plan status, and no-vulnerability
+  evidence.

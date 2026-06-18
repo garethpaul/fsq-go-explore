@@ -71,6 +71,8 @@
   explicit positive timeouts, and do not mutate caller-owned configuration.
 - Refuse Foursquare API and OAuth user redirects before credential-bearing
   query parameters can be forwarded.
+- Use Go 1.25.11 or newer so maintained verification includes the required
+  standard-library security fixes.
 
 ## Agent workflow
 
