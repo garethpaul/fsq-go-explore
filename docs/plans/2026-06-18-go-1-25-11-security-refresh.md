@@ -85,6 +85,8 @@ Verification:
   toolchain; the pre-change Go 1.25.3 scan reported 18 reachable
   standard-library vulnerabilities.
 - Repository-root and external-directory `make check` passed under Go 1.25.11.
-- Four isolated hostile mutations were rejected across the declared toolchain
-  floor, actual runtime floor, completed plan status, and no-vulnerability
-  evidence.
+- Five isolated hostile mutations were rejected across the declared toolchain
+  floor, actual runtime floor, completed plan status, no-vulnerability
+  evidence, and hosted verification evidence.
+- Push run `27732254902` and pull-request run `27732263286` completed
+  successfully for exact head `b96855dd8eb4b2271577c0bbfa2c615e07b06a5b`.

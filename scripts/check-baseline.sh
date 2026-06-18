@@ -1393,10 +1393,13 @@ required = (
     "18 reachable vulnerabilities",
     "`go test -race -count=1 ./...`",
     "`govulncheck` reported no reachable vulnerabilities",
-    "Four isolated hostile mutations were rejected",
+    "Five isolated hostile mutations were rejected",
+    "Push run `27732254902`",
+    "pull-request run `27732263286`",
+    "`b96855dd8eb4b2271577c0bbfa2c615e07b06a5b`",
 )
 if any(item not in plan for item in required):
-    raise SystemExit("Go security plan must preserve completed local and vulnerability verification evidence.")
+    raise SystemExit("Go security plan must preserve completed local, vulnerability, and hosted verification evidence.")
 PY
 
 printf '%s\n' "fsq-go-explore Go baseline checks passed."
