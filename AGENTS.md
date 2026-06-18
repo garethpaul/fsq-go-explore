@@ -73,6 +73,9 @@
   query parameters can be forwarded.
 - Use Go 1.25.11 or newer so maintained verification includes the required
   standard-library security fixes.
+- Keep the reviewed pair `github.com/golang/protobuf` v1.5.4 and
+  `google.golang.org/protobuf` v1.36.11 together; the App Engine dependency
+  graph must not restore the vulnerable v1.26.0 runtime.
 
 ## Agent workflow
 

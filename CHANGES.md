@@ -5,6 +5,8 @@
 - Raised the maintained Go toolchain to 1.25.11 to incorporate standard-library
   fixes for reachable template, TLS, X.509, HTTP/2, URL, form, and MIME-header
   vulnerabilities.
+- Refreshed the transitive protobuf compatibility layer and runtime to remove
+  the module-level GO-2024-2611 advisory from the App Engine dependency graph.
 
 ## 2026-06-17
 

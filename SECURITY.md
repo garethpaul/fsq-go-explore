@@ -96,6 +96,12 @@ Build and test this repository with Go 1.25.11 or newer. Earlier Go 1.25
 patch releases retain reachable standard-library vulnerabilities in template,
 TLS, X.509, HTTP/2, URL, form, and MIME-header paths used by this application.
 
+The legacy App Engine graph must retain the reviewed pair
+`github.com/golang/protobuf` v1.5.4 and `google.golang.org/protobuf` v1.36.11.
+Earlier protobuf runtimes include a module-level JSON unmarshalling
+denial-of-service advisory even when the current application has no reachable
+vulnerable symbol.
+
 ## Safe Research Guidelines
 
 Good-faith research is welcome when it stays within these boundaries:
