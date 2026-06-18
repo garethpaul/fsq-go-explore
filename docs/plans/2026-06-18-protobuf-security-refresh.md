@@ -1,7 +1,7 @@
 ---
 title: Protobuf Security Refresh
 type: security
-status: planned
+status: completed
 date: 2026-06-18
 execution: code
 ---
@@ -132,6 +132,29 @@ v1.36.11.
   modes, and whitespace before committing explicit paths.
 - Require terminal canonical push and pull-request checks on the exact final
   head before terminal tracker reconciliation.
+
+## Verification Completed
+
+- The implementation commit
+  `de1f0de166985d3f1c4ab855eb9e1ea60b488c4f` resolved
+  `github.com/golang/protobuf` v1.5.4 and
+  `google.golang.org/protobuf` v1.36.11 while preserving all direct module
+  requirements.
+- `go test -race -count=1 ./...`, `go vet ./...`, `go build ./...`,
+  `go mod tidy -diff`, every repository Make alias, and the external-directory
+  Makefile gate passed under Go 1.25.11.
+- `govulncheck -show verbose ./...` reported `No vulnerabilities found.`
+  across all six required modules and the Go 1.25.11 standard library, removing
+  the module-level GO-2024-2611 finding.
+- Eight isolated Git-backed mutations were rejected with contract-specific
+  messages when either protobuf version, the README or changelog guidance,
+  completed status, zero-vulnerability evidence, hosted run evidence, or the
+  implementation SHA was weakened.
+- Push run `27756036452` and pull-request run `27756048496` both completed with
+  `success` on the exact implementation commit. A branch-scoped code-scanning
+  query returned zero open alerts.
+- No live Foursquare or App Engine request was made; those integrations remain
+  outside the offline verification boundary.
 
 ## Risks
 

@@ -1420,4 +1420,30 @@ if any(item not in plan for item in required):
     raise SystemExit("Go security plan must preserve completed local, vulnerability, and hosted verification evidence.")
 PY
 
+python3 - "$PROTOBUF_SECURITY_PLAN" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+plan = Path(sys.argv[1]).read_text()
+normalized = " ".join(plan.split())
+required = (
+    "status: completed",
+    "GO-2024-2611",
+    "`github.com/golang/protobuf` v1.5.4",
+    "`google.golang.org/protobuf` v1.36.11",
+    "`govulncheck -show verbose ./...` reported `No vulnerabilities found.`",
+    "Eight isolated Git-backed mutations were rejected",
+    "Push run `27756036452`",
+    "pull-request run `27756048496`",
+    "`de1f0de166985d3f1c4ab855eb9e1ea60b488c4f`",
+)
+verification = plan.split("## Verification Completed", 1)[-1]
+if (
+    any(item not in normalized for item in required)
+    or re.search(r"\b(?:pending|todo|tbd|not run|not yet)\b", verification, re.IGNORECASE)
+):
+    raise SystemExit("Protobuf security plan must preserve completed local, module, mutation, and hosted verification evidence.")
+PY
+
 printf '%s\n' "fsq-go-explore Go baseline checks passed."
