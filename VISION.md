@@ -39,6 +39,18 @@ Current baseline:
   string.
 - OAuth callbacks reject missing OAuth authorization codes before token exchange
   work starts.
+- OAuth user-profile responses require 2xx status, the exact final HTTPS
+  Foursquare user endpoint, and exactly one JSON media-type field before reads,
+  followed by a 1 MiB body boundary before wrapper or user decoding.
+- Foursquare clients refuse redirects before credential-bearing queries can be
+  forwarded to another destination.
+- OAuth user-profile requests use a 10-second end-to-end timeout so stalled
+  upstream work cannot hold the callback open indefinitely.
+- OAuth user-profile identities require canonical nonempty IDs before session publication.
+- Reject duplicate OAuth user-profile JSON member names before typed identity
+  decoding and session publication, including case-folded aliases.
+- Reject malformed UTF-8 OAuth user-profile bodies before JSON parsing or
+  session publication.
 - Auth cookies validate generated user cache keys before access-token memcache
   lookup starts.
 - Protected routes validate generated auth cookie cache keys before handler
@@ -51,6 +63,18 @@ Current baseline:
   Foursquare edit API work.
 - Propose-edit limits request bodies to 64 KiB before form parsing, auth-cookie
   lookup, or Foursquare edit API work.
+- Foursquare JSON response parsing is limited to 2 MiB before envelope or
+  venue decoding.
+- Reject malformed UTF-8 Foursquare JSON response bodies before envelope or
+  venue decoding while preserving valid Unicode venue data.
+- Non-2xx Foursquare search and venue detail responses are rejected before decoding
+  so upstream error envelopes cannot become successful venue data.
+- Venue edit responses reject non-2xx status before a bounded discard of
+  successful response bodies.
+- Foursquare responses retain the exact final HTTPS API host and operation path
+  before media validation, decoding, or successful body disposal.
+- Foursquare HTTP clients default to a 10-second end-to-end timeout while
+  preserving explicit positive caller values and caller configuration ownership.
 - Search query and location parameters are trimmed and length-bounded before
   venue search requests.
 - The local Makefile exposes lint, test, build, and check targets for a stable
@@ -69,6 +93,8 @@ Next priorities:
 - Clarify secret handling for local and hosted environments
 - Keep state-changing handlers method-constrained and covered by tests
 - Keep missing OAuth authorization codes covered before exchange work is added
+- Keep OAuth user-profile final endpoint and JSON media-type checks ahead of
+  response reads
 - Keep user cache keys validated before memcache lookup
 - Keep protected-route auth cookie validation covered before handler work starts
 - Keep ETag matching exact when changing header-cache behavior
@@ -79,6 +105,12 @@ Next priorities:
 - Keep malformed edit forms rejected before auth-cookie lookup and Foursquare
   edit API calls
 - Keep venue edit request bodies bounded before parsing or auth work
+- Keep Foursquare response bodies bounded before JSON parsing
+- Keep raw Foursquare JSON response UTF-8 validation ahead of envelope decoding
+- Keep non-2xx Foursquare search and venue detail responses out of JSON decoding
+- Keep venue edit response status checks ahead of bounded body disposal
+- Keep final Foursquare response endpoint checks ahead of response reads
+- Keep the default Foursquare client timeout and caller immutability covered
 - Keep search parameter bounds covered as request parsing changes
 - Keep local verification targets available as the Go/App Engine toolchain
   evolves
