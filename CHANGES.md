@@ -1,7 +1,55 @@
 # Changes
 
+## 2026-06-18
+
+- Raised the maintained Go toolchain to 1.25.11 to incorporate standard-library
+  fixes for reachable template, TLS, X.509, HTTP/2, URL, form, and MIME-header
+  vulnerabilities.
+- Refreshed the transitive protobuf compatibility layer and runtime to remove
+  the module-level GO-2024-2611 advisory from the App Engine dependency graph.
+
+## 2026-06-17
+
+- Rejected malformed UTF-8 Foursquare venue and search response bodies before
+  JSON envelope decoding.
+- Rejected malformed UTF-8 OAuth user-profile bodies before JSON parsing and
+  session identity publication.
+
+## 2026-06-15
+
+- Rejected case-folded duplicate OAuth user-profile JSON members before typed
+  identity decoding.
+- Rejected duplicate OAuth user-profile JSON members before typed identity decoding.
+- Rejected duplicate or combined OAuth user-profile Content-Type metadata before response reads.
+- Rejected duplicate Foursquare API Content-Type fields before response reads.
+- Rejected missing, empty, and edge-whitespace OAuth user IDs before access-token caching or cookie publication.
+- Bounded OAuth user-profile requests with a 10-second end-to-end timeout.
+- Refused redirects for Foursquare API and OAuth user requests before query
+  credentials or access tokens can be forwarded.
+- Added shared-policy, client-construction, focused-test, documentation,
+  mutation, and completed-evidence contracts.
+
+## 2026-06-14
+
+- Required OAuth user-profile responses to retain the exact final HTTPS
+  Foursquare endpoint and a JSON media type before response reads.
+- Required search, venue-detail, and venue-edit responses to retain the exact
+  final HTTPS Foursquare API host and operation path before response reads.
+- Bounded successful venue edit response disposal to 2 MiB plus one detection
+  byte and rejected non-2xx statuses before body reads.
+
 ## 2026-06-13
 
+- Made Go verification independent of the caller's working directory by
+  resolving the baseline checker from the loaded Makefile.
+- Rejected non-2xx and over-1-MiB OAuth user-profile responses before session
+  state is created.
+- Added a 10-second default Foursquare HTTP client timeout while preserving
+  explicit positive caller values and caller configuration ownership.
+- Added focused constructor tests and mutation-sensitive timeout contracts.
+- Rejected non-2xx Foursquare search and venue detail responses before JSON decoding,
+  preventing error envelopes from populating successful result structures.
+- Added focused transport tests and method-scoped static ordering contracts.
 - Bounded Foursquare JSON response parsing to 2 MiB before unmarshalling and
   added exact-limit, oversized-body, and reader-error tests.
 
