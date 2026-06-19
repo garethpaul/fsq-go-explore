@@ -51,6 +51,7 @@
   non-JSON media types before reads; cap accepted profile bodies at 1 MiB before
   decoding.
 - Require exactly one OAuth user-profile `Content-Type` field before reads.
+- Require exactly one Foursquare API `Content-Type` field before reads.
 - Keep OAuth user-profile requests bounded by a 10-second end-to-end timeout.
 - Reject missing, empty, or edge-whitespace OAuth user IDs before access-token caching or cookie publication.
 - Reject duplicate OAuth user-profile JSON member names at every object nesting
@@ -73,6 +74,9 @@
   query parameters can be forwarded.
 - Use Go 1.25.11 or newer so maintained verification includes the required
   standard-library security fixes.
+- Keep the reviewed pair `github.com/golang/protobuf` v1.5.4 and
+  `google.golang.org/protobuf` v1.36.11 together; the App Engine dependency
+  graph must not restore the vulnerable v1.26.0 runtime.
 
 ## Agent workflow
 

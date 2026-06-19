@@ -53,6 +53,8 @@ endpoints, and non-JSON media types before body reads and enforce a 1 MiB limit
 before JSON decoding or session creation.
 OAuth user-profile responses must contain exactly one JSON `Content-Type` field
 before any response-body read.
+Foursquare API responses must also contain exactly one JSON `Content-Type` field
+before any response-body read.
 Foursquare API and OAuth user clients must refuse redirects before
 credential-bearing query parameters can be forwarded to another destination.
 OAuth user-profile requests must use a 10-second end-to-end timeout in addition
@@ -95,6 +97,12 @@ Dependency updates should come from trusted package managers and should keep loc
 Build and test this repository with Go 1.25.11 or newer. Earlier Go 1.25
 patch releases retain reachable standard-library vulnerabilities in template,
 TLS, X.509, HTTP/2, URL, form, and MIME-header paths used by this application.
+
+The legacy App Engine graph must retain the reviewed pair
+`github.com/golang/protobuf` v1.5.4 and `google.golang.org/protobuf` v1.36.11.
+Earlier protobuf runtimes include a module-level JSON unmarshalling
+denial-of-service advisory even when the current application has no reachable
+vulnerable symbol.
 
 ## Safe Research Guidelines
 

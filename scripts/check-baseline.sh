@@ -31,6 +31,7 @@ OAUTH_USER_CASE_FOLDED_JSON_PLAN="$ROOT_DIR/docs/plans/2026-06-15-oauth-user-cas
 OAUTH_USER_VALID_UTF8_PLAN="$ROOT_DIR/docs/plans/2026-06-17-oauth-user-valid-utf8.md"
 API_VALID_UTF8_PLAN="$ROOT_DIR/docs/plans/2026-06-17-001-fix-foursquare-api-valid-utf8-plan.md"
 GO_SECURITY_PLAN="$ROOT_DIR/docs/plans/2026-06-18-go-1-25-11-security-refresh.md"
+PROTOBUF_SECURITY_PLAN="$ROOT_DIR/docs/plans/2026-06-18-protobuf-security-refresh.md"
 LOCATION_INDEPENDENT_MAKE_PLAN="$ROOT_DIR/docs/plans/2026-06-13-location-independent-make.md"
 RESPONSE_CONTENT_TYPE_PLAN="$ROOT_DIR/docs/plans/2026-06-14-fsq-response-content-type.md"
 VENUE_EDIT_RESPONSE_PLAN="$ROOT_DIR/docs/plans/2026-06-14-fsq-venue-edit-response-boundary.md"
@@ -91,6 +92,7 @@ for path in \
   "docs/plans/2026-06-17-oauth-user-valid-utf8.md" \
   "docs/plans/2026-06-17-001-fix-foursquare-api-valid-utf8-plan.md" \
   "docs/plans/2026-06-18-go-1-25-11-security-refresh.md" \
+  "docs/plans/2026-06-18-protobuf-security-refresh.md" \
   "docs/plans/2026-06-12-fsq-rate-limiter-refill.md" \
   "docs/plans/2026-06-12-fsq-edit-body-limit.md" \
   "docs/plans/2026-06-13-fsq-response-body-limit.md" \
@@ -228,7 +230,8 @@ import sys
 from pathlib import Path
 
 go_mod_path, runtime = sys.argv[1:]
-match = re.search(r"^go ([0-9]+\.[0-9]+\.[0-9]+)$", Path(go_mod_path).read_text(), re.MULTILINE)
+go_mod = Path(go_mod_path).read_text()
+match = re.search(r"^go ([0-9]+\.[0-9]+\.[0-9]+)$", go_mod, re.MULTILINE)
 if match is None or match.group(1) != "1.25.11":
     raise SystemExit("go.mod must require the patched Go 1.25.11 toolchain")
 
@@ -238,6 +241,13 @@ if runtime_match is None:
 runtime_version = tuple(int(value or 0) for value in runtime_match.groups())
 if runtime_version < (1, 25, 11):
     raise SystemExit("Go 1.25.11 or newer is required for standard-library security fixes")
+
+required_modules = (
+    "github.com/golang/protobuf v1.5.4 // indirect",
+    "google.golang.org/protobuf v1.36.11 // indirect",
+)
+if any(go_mod.count(module) != 1 for module in required_modules):
+    raise SystemExit("go.mod must retain the reviewed protobuf compatibility and runtime versions")
 PY
   unformatted=$(find "$ROOT_DIR" -name '*.go' -not -path "$ROOT_DIR/.git/*" -print | xargs gofmt -l)
   if [ -n "$unformatted" ]; then
@@ -681,6 +691,14 @@ if ! grep -Fq "Go 1.25.11 or newer" "$ROOT_DIR/README.md" || \
   ! grep -Fq "Build and test this repository with Go 1.25.11 or newer" "$ROOT_DIR/SECURITY.md" || \
   ! grep -Fq "Use Go 1.25.11 or newer" "$ROOT_DIR/AGENTS.md"; then
   printf '%s\n' "Project guidance must retain the patched Go toolchain boundary." >&2
+  exit 1
+fi
+
+if ! grep -Fq '`google.golang.org/protobuf` v1.36.11' "$ROOT_DIR/README.md" || \
+  ! grep -Fq '`google.golang.org/protobuf` v1.36.11' "$ROOT_DIR/SECURITY.md" || \
+  ! grep -Fq '`google.golang.org/protobuf` v1.36.11' "$ROOT_DIR/AGENTS.md" || \
+  ! grep -Fq "Refreshed the transitive protobuf compatibility layer" "$ROOT_DIR/CHANGES.md"; then
+  printf '%s\n' "Project guidance must retain the reviewed protobuf dependency boundary." >&2
   exit 1
 fi
 
@@ -1400,6 +1418,32 @@ required = (
 )
 if any(item not in plan for item in required):
     raise SystemExit("Go security plan must preserve completed local, vulnerability, and hosted verification evidence.")
+PY
+
+python3 - "$PROTOBUF_SECURITY_PLAN" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+plan = Path(sys.argv[1]).read_text()
+normalized = " ".join(plan.split())
+required = (
+    "status: completed",
+    "GO-2024-2611",
+    "`github.com/golang/protobuf` v1.5.4",
+    "`google.golang.org/protobuf` v1.36.11",
+    "`govulncheck -show verbose ./...` reported `No vulnerabilities found.`",
+    "Eight isolated Git-backed mutations were rejected",
+    "Push run `27756036452`",
+    "pull-request run `27756048496`",
+    "`de1f0de166985d3f1c4ab855eb9e1ea60b488c4f`",
+)
+verification = plan.split("## Verification Completed", 1)[-1]
+if (
+    any(item not in normalized for item in required)
+    or re.search(r"\b(?:pending|todo|tbd|not run|not yet)\b", verification, re.IGNORECASE)
+):
+    raise SystemExit("Protobuf security plan must preserve completed local, module, mutation, and hosted verification evidence.")
 PY
 
 printf '%s\n' "fsq-go-explore Go baseline checks passed."
