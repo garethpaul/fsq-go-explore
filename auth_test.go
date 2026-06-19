@@ -1,6 +1,7 @@
 package app
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -219,6 +220,43 @@ func TestDecodeOAuthUserResponsePreservesReadError(t *testing.T) {
 	}
 }
 
+func TestDecodeOAuthUserResponseRejectsInvalidUTF8(t *testing.T) {
+	invalidID := append([]byte(`{"response":{"user":{"id":"`), 0xff)
+	invalidID = append(invalidID, []byte(`"}}}`)...)
+	invalidMember := append([]byte(`{"response":{"user":{"id":"user-1"},"`), 0xff)
+	invalidMember = append(invalidMember, []byte(`":true}}`)...)
+
+	for name, body := range map[string][]byte{
+		"identity value": invalidID,
+		"member name":    invalidMember,
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, err := decodeOAuthUserResponse(oauthUserResponse(
+				http.StatusOK,
+				"application/json",
+				io.NopCloser(bytes.NewReader(body)),
+			))
+			if !errors.Is(err, errOAuthUserResponseInvalidUTF8) {
+				t.Fatalf("error = %v, want %v", err, errOAuthUserResponseInvalidUTF8)
+			}
+		})
+	}
+}
+
+func TestDecodeOAuthUserResponseAcceptsValidUnicodeIdentity(t *testing.T) {
+	user, err := decodeOAuthUserResponse(oauthUserResponse(
+		http.StatusOK,
+		"application/json",
+		io.NopCloser(strings.NewReader(`{"response":{"user":{"id":"用户-1"}}}`)),
+	))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if user.User.ID != "用户-1" {
+		t.Fatalf("user ID = %q, want %q", user.User.ID, "用户-1")
+	}
+}
+
 func TestDecodeOAuthUserResponseRejectsMalformedPayloads(t *testing.T) {
 	for name, body := range map[string]string{
 		"wrapper": `{"response":`,
@@ -239,10 +277,14 @@ func TestDecodeOAuthUserResponseRejectsMalformedPayloads(t *testing.T) {
 
 func TestDecodeOAuthUserResponseRejectsDuplicateJSONMembers(t *testing.T) {
 	for name, body := range map[string]string{
-		"response":     `{"response":{"user":{"id":"user-1"}},"response":{"user":{"id":"user-2"}}}`,
-		"user":         `{"response":{"user":{"id":"user-1"},"user":{"id":"user-2"}}}`,
-		"id":           `{"response":{"user":{"id":"user-1","id":"user-2"}}}`,
-		"array object": `{"response":{"user":{"id":"user-1"},"items":[{"value":1,"value":2}]}}`,
+		"response":             `{"response":{"user":{"id":"user-1"}},"response":{"user":{"id":"user-2"}}}`,
+		"user":                 `{"response":{"user":{"id":"user-1"},"user":{"id":"user-2"}}}`,
+		"id":                   `{"response":{"user":{"id":"user-1","id":"user-2"}}}`,
+		"array object":         `{"response":{"user":{"id":"user-1"},"items":[{"value":1,"value":2}]}}`,
+		"case-folded response": `{"response":{"user":{"id":"user-1"}},"Response":{"user":{"id":"user-2"}}}`,
+		"case-folded user":     `{"response":{"user":{"id":"user-1"},"User":{"id":"user-2"}}}`,
+		"case-folded id":       `{"response":{"user":{"id":"user-1","ID":"user-2"}}}`,
+		"Unicode fold":         `{"response":{"user":{"id":"user-1"},"items":[{"K":1,"\u212a":2}]}}`,
 	} {
 		t.Run(name, func(t *testing.T) {
 			_, err := decodeOAuthUserResponse(oauthUserResponse(
