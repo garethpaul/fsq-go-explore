@@ -48,8 +48,23 @@ Request Entity Too Large` before auth-cookie lookup, token cache work, or
 Foursquare edit API calls when exceeded.
 OAuth callbacks should reject missing authorization codes before token exchange
 work starts, even when the state cookie matches.
-OAuth user-profile responses should reject non-2xx statuses before body reads
-and enforce a 1 MiB limit before JSON decoding or session creation.
+OAuth user-profile responses should reject non-2xx statuses, unexpected final
+endpoints, and non-JSON media types before body reads and enforce a 1 MiB limit
+before JSON decoding or session creation.
+OAuth user-profile responses must contain exactly one JSON `Content-Type` field
+before any response-body read.
+Foursquare API responses must also contain exactly one JSON `Content-Type` field
+before any response-body read.
+Foursquare API and OAuth user clients must refuse redirects before
+credential-bearing query parameters can be forwarded to another destination.
+OAuth user-profile requests must use a 10-second end-to-end timeout in addition
+to redirect refusal and response validation.
+OAuth user-profile identities must reject missing, empty, or edge-whitespace IDs before access-token caching or cookie publication.
+OAuth user-profile JSON objects must reject duplicate member names before typed
+identity decoding, access-token caching, or cookie publication, including
+case-folded names that Go maps to the same typed field.
+OAuth user-profile bodies must be valid UTF-8 before duplicate-member scanning
+or typed decoding so invalid provider bytes cannot become cached identities.
 Auth cookies should validate generated user cache keys before memcache lookup so
 malformed cookie values do not reach access-token cache work.
 Protected routes should reject malformed auth-cookie cache keys before handler
@@ -61,10 +76,16 @@ Rate-limiter buckets should refill `Max` requests over `TTL`, and non-positive
 rate configurations should fail closed instead of disabling throttling.
 Foursquare JSON response bodies must remain limited to 2 MiB before parsing;
 oversized or failed reads should not reach JSON unmarshalling.
+Bounded Foursquare JSON response bodies must be valid UTF-8 before envelope
+decoding so malformed upstream text fails closed instead of being normalized
+into replacement characters.
 Non-2xx Foursquare search and venue detail responses must not reach JSON decoding;
 status failures should log only the numeric status and return empty results.
 Venue edit responses must reject non-2xx status before body reads and bound
 successful response disposal to 2 MiB plus one detection byte.
+Successful search, venue-detail, and venue-edit responses must retain the exact
+final HTTPS Foursquare API host and operation path before response reads or
+decoding. Rejections must not log final URLs, query credentials, or bodies.
 Foursquare HTTP clients should use a 10-second default end-to-end timeout when
 no positive caller timeout is configured; service construction must not mutate
 caller-owned configuration.
@@ -72,6 +93,16 @@ caller-owned configuration.
 ## Dependency and Supply Chain Security
 
 Dependency updates should come from trusted package managers and should keep lockfiles in sync when lockfiles exist. Do not commit credentials, private keys, tokens, generated secrets, or machine-local configuration. If a vulnerability depends on a compromised package, typosquatting risk, insecure transitive dependency, or unsafe build step, include the package name, affected version, and the path through which it is used.
+
+Build and test this repository with Go 1.25.11 or newer. Earlier Go 1.25
+patch releases retain reachable standard-library vulnerabilities in template,
+TLS, X.509, HTTP/2, URL, form, and MIME-header paths used by this application.
+
+The legacy App Engine graph must retain the reviewed pair
+`github.com/golang/protobuf` v1.5.4 and `google.golang.org/protobuf` v1.36.11.
+Earlier protobuf runtimes include a module-level JSON unmarshalling
+denial-of-service advisory even when the current application has no reachable
+vulnerable symbol.
 
 ## Safe Research Guidelines
 
