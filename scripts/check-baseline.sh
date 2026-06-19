@@ -26,6 +26,12 @@ REDIRECT_REFUSAL_PLAN="$ROOT_DIR/docs/plans/2026-06-15-foursquare-redirect-refus
 OAUTH_USER_TIMEOUT_PLAN="$ROOT_DIR/docs/plans/2026-06-15-oauth-user-request-timeout.md"
 OAUTH_USER_ID_PLAN="$ROOT_DIR/docs/plans/2026-06-15-oauth-user-id-boundary.md"
 OAUTH_USER_CONTENT_TYPE_PLAN="$ROOT_DIR/docs/plans/2026-06-15-oauth-user-content-type-cardinality.md"
+OAUTH_USER_DUPLICATE_JSON_PLAN="$ROOT_DIR/docs/plans/2026-06-15-oauth-user-duplicate-json-members.md"
+OAUTH_USER_CASE_FOLDED_JSON_PLAN="$ROOT_DIR/docs/plans/2026-06-15-oauth-user-case-folded-json-members.md"
+OAUTH_USER_VALID_UTF8_PLAN="$ROOT_DIR/docs/plans/2026-06-17-oauth-user-valid-utf8.md"
+API_VALID_UTF8_PLAN="$ROOT_DIR/docs/plans/2026-06-17-001-fix-foursquare-api-valid-utf8-plan.md"
+GO_SECURITY_PLAN="$ROOT_DIR/docs/plans/2026-06-18-go-1-25-11-security-refresh.md"
+PROTOBUF_SECURITY_PLAN="$ROOT_DIR/docs/plans/2026-06-18-protobuf-security-refresh.md"
 LOCATION_INDEPENDENT_MAKE_PLAN="$ROOT_DIR/docs/plans/2026-06-13-location-independent-make.md"
 RESPONSE_CONTENT_TYPE_PLAN="$ROOT_DIR/docs/plans/2026-06-14-fsq-response-content-type.md"
 VENUE_EDIT_RESPONSE_PLAN="$ROOT_DIR/docs/plans/2026-06-14-fsq-venue-edit-response-boundary.md"
@@ -81,6 +87,12 @@ for path in \
   "docs/plans/2026-06-15-oauth-user-request-timeout.md" \
   "docs/plans/2026-06-15-oauth-user-id-boundary.md" \
   "docs/plans/2026-06-15-oauth-user-content-type-cardinality.md" \
+  "docs/plans/2026-06-15-oauth-user-duplicate-json-members.md" \
+  "docs/plans/2026-06-15-oauth-user-case-folded-json-members.md" \
+  "docs/plans/2026-06-17-oauth-user-valid-utf8.md" \
+  "docs/plans/2026-06-17-001-fix-foursquare-api-valid-utf8-plan.md" \
+  "docs/plans/2026-06-18-go-1-25-11-security-refresh.md" \
+  "docs/plans/2026-06-18-protobuf-security-refresh.md" \
   "docs/plans/2026-06-12-fsq-rate-limiter-refill.md" \
   "docs/plans/2026-06-12-fsq-edit-body-limit.md" \
   "docs/plans/2026-06-13-fsq-response-body-limit.md" \
@@ -148,7 +160,8 @@ from pathlib import Path
 source = Path(sys.argv[1]).read_text()
 tests = Path(sys.argv[2]).read_text()
 decoder = source.split("func decodeFoursquareResponse", 1)[-1]
-decoder_tests = tests.split("func TestDecodeFoursquareResponseAcceptsExactLimit", 1)[-1]
+oversize_test = tests.split("func TestDecodeFoursquareResponseRejectsOversizeBody", 1)[-1].split("\n}\n", 1)[0]
+read_error_test = tests.split("func TestDecodeFoursquareResponsePreservesReadError", 1)[-1].split("\n}\n", 1)[0]
 source_contracts = (
     "io.ReadAll(io.LimitReader(body, maxFoursquareResponseBytes+1))",
     "if len(data) > maxFoursquareResponseBytes",
@@ -168,13 +181,12 @@ if source.count("maxFoursquareResponseBytes = 2 * 1024 * 1024") != 1 or source.c
     raise SystemExit("Foursquare response decoding must keep one exact 2 MiB parse boundary.")
 if any(tests.count(item) != 1 for item in test_contracts):
     raise SystemExit("Foursquare response parsing must keep exact-limit, oversize, and read-error tests.")
-for item in (
-    "maxFoursquareResponseBytes+1",
-    "errors.Is(err, errFoursquareResponseTooLarge)",
-    "errors.Is(err, errTestReadFailure)",
+if (
+    "maxFoursquareResponseBytes+1" not in oversize_test
+    or "errors.Is(err, errFoursquareResponseTooLarge)" not in oversize_test
+    or "errors.Is(err, errTestReadFailure)" not in read_error_test
 ):
-    if decoder_tests.count(item) != 1:
-        raise SystemExit("Foursquare response parsing tests must preserve the decoder-specific boundary assertions.")
+    raise SystemExit("Foursquare response parsing tests must preserve the decoder-specific boundary assertions.")
 if "io.ReadAll(body)" in source:
     raise SystemExit("Foursquare response decoding must not read an unbounded body.")
 PY
@@ -212,6 +224,31 @@ if any(item not in tests for item in required_tests):
 PY
 
 if command -v go >/dev/null 2>&1; then
+  python3 - "$ROOT_DIR/go.mod" "$(cd "$ROOT_DIR" && go env GOVERSION)" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+go_mod_path, runtime = sys.argv[1:]
+go_mod = Path(go_mod_path).read_text()
+match = re.search(r"^go ([0-9]+\.[0-9]+\.[0-9]+)$", go_mod, re.MULTILINE)
+if match is None or match.group(1) != "1.25.11":
+    raise SystemExit("go.mod must require the patched Go 1.25.11 toolchain")
+
+runtime_match = re.fullmatch(r"go([0-9]+)\.([0-9]+)(?:\.([0-9]+))?", runtime)
+if runtime_match is None:
+    raise SystemExit("Unable to parse Go runtime version: " + runtime)
+runtime_version = tuple(int(value or 0) for value in runtime_match.groups())
+if runtime_version < (1, 25, 11):
+    raise SystemExit("Go 1.25.11 or newer is required for standard-library security fixes")
+
+required_modules = (
+    "github.com/golang/protobuf v1.5.4 // indirect",
+    "google.golang.org/protobuf v1.36.11 // indirect",
+)
+if any(go_mod.count(module) != 1 for module in required_modules):
+    raise SystemExit("go.mod must retain the reviewed protobuf compatibility and runtime versions")
+PY
   unformatted=$(find "$ROOT_DIR" -name '*.go' -not -path "$ROOT_DIR/.git/*" -print | xargs gofmt -l)
   if [ -n "$unformatted" ]; then
     printf '%s\n' "Go files need gofmt:" >&2
@@ -650,6 +687,21 @@ if ! grep -Fq "Malformed venue edit forms should be rejected" "$ROOT_DIR/SECURIT
   exit 1
 fi
 
+if ! grep -Fq "Go 1.25.11 or newer" "$ROOT_DIR/README.md" || \
+  ! grep -Fq "Build and test this repository with Go 1.25.11 or newer" "$ROOT_DIR/SECURITY.md" || \
+  ! grep -Fq "Use Go 1.25.11 or newer" "$ROOT_DIR/AGENTS.md"; then
+  printf '%s\n' "Project guidance must retain the patched Go toolchain boundary." >&2
+  exit 1
+fi
+
+if ! grep -Fq '`google.golang.org/protobuf` v1.36.11' "$ROOT_DIR/README.md" || \
+  ! grep -Fq '`google.golang.org/protobuf` v1.36.11' "$ROOT_DIR/SECURITY.md" || \
+  ! grep -Fq '`google.golang.org/protobuf` v1.36.11' "$ROOT_DIR/AGENTS.md" || \
+  ! grep -Fq "Refreshed the transitive protobuf compatibility layer" "$ROOT_DIR/CHANGES.md"; then
+  printf '%s\n' "Project guidance must retain the reviewed protobuf dependency boundary." >&2
+  exit 1
+fi
+
 exact_line_count() {
   awk -v expected="$2" '$0 == expected { count += 1 } END { print count + 0 }' "$1"
 }
@@ -1085,5 +1137,313 @@ if ! grep -Fq 'exactly one JSON media-type' "$ROOT_DIR/README.md" ||
   printf '%s\n' "Project docs must preserve OAuth user Content-Type cardinality." >&2
   exit 1
 fi
+
+python3 - "$ROOT_DIR/auth.go" "$ROOT_DIR/auth_test.go" <<'PY'
+import sys
+from pathlib import Path
+
+source = Path(sys.argv[1]).read_text()
+tests = Path(sys.argv[2]).read_text()
+
+source_contracts = (
+    '"unicode/utf8"',
+    "errOAuthUserResponseInvalidUTF8",
+    'errors.New("foursquare user response was not valid UTF-8")',
+    "if !utf8.Valid(body) {",
+    "return nil, errOAuthUserResponseInvalidUTF8",
+)
+if any(contract not in source for contract in source_contracts):
+    raise SystemExit("OAuth user responses must reject malformed UTF-8 before JSON decoding.")
+
+decode = source[source.index("func decodeOAuthUserResponse("):source.index("func rejectDuplicateJSONMembers(")]
+size_check = decode.find("len(body) > maxOAuthUserResponseBytes")
+utf8_check = decode.find("utf8.Valid(body)")
+duplicate_check = decode.find("rejectDuplicateJSONMembers(body)")
+typed_decode = decode.find("json.Unmarshal(body, wrapper)")
+if not (0 <= size_check < utf8_check < duplicate_check < typed_decode):
+    raise SystemExit("OAuth UTF-8 validation must follow the size bound and precede JSON parsing.")
+
+test_contracts = (
+    "TestDecodeOAuthUserResponseRejectsInvalidUTF8",
+    '"identity value"',
+    '"member name"',
+    "errors.Is(err, errOAuthUserResponseInvalidUTF8)",
+    "TestDecodeOAuthUserResponseAcceptsValidUnicodeIdentity",
+)
+if any(contract not in tests for contract in test_contracts):
+    raise SystemExit("OAuth UTF-8 tests must cover malformed values, member names, and valid Unicode.")
+PY
+
+if ! grep -Fq 'valid UTF-8 before JSON tokenization' "$ROOT_DIR/README.md" || \
+  ! grep -Fq 'valid UTF-8 before duplicate-member scanning' "$ROOT_DIR/SECURITY.md" || \
+  ! grep -Fq 'Reject malformed UTF-8 OAuth user-profile bodies' "$ROOT_DIR/VISION.md" || \
+  ! grep -Fq 'Rejected malformed UTF-8 OAuth user-profile bodies' "$ROOT_DIR/CHANGES.md" || \
+  ! grep -Fq 'Reject malformed UTF-8 OAuth user-profile bodies' "$ROOT_DIR/AGENTS.md"; then
+  printf '%s\n' "Project docs must preserve OAuth user response UTF-8 validation." >&2
+  exit 1
+fi
+
+python3 - "$OAUTH_USER_VALID_UTF8_PLAN" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+plan = Path(sys.argv[1]).read_text()
+frontmatter = plan.split("---", 2)[1]
+statuses = re.findall(r"^status: .+$", frontmatter, flags=re.MULTILINE)
+required = (
+    "repository-root and external-directory `make check`",
+    "`go test -race -count=1 ./...` passed",
+    "`go vet ./...` passed",
+    "Five isolated hostile mutations were rejected",
+    "No live OAuth callback was executed",
+)
+if statuses != ["status: completed"] or any(item not in plan for item in required):
+    raise SystemExit("OAuth UTF-8 plan must record completed verification.")
+PY
+
+python3 - "$ROOT_DIR/auth.go" "$ROOT_DIR/auth_test.go" <<'PY'
+import sys
+from pathlib import Path
+
+source = Path(sys.argv[1]).read_text()
+tests = Path(sys.argv[2]).read_text()
+
+source_contracts = (
+    "errOAuthUserResponseDuplicateKey",
+    'errors.New("foursquare user response contained a duplicate JSON member")',
+    'func rejectDuplicateJSONMembers(body []byte) error',
+    'decoder.UseNumber()',
+    'members := make(map[string]struct{})',
+    'foldedKey := foldJSONMemberName(key)',
+    'if _, exists := members[foldedKey]; exists {',
+    'if err := consumeUniqueJSONValue(decoder, depth+1); err != nil {',
+    'if err := rejectDuplicateJSONMembers(body); err != nil {',
+)
+if any(contract not in source for contract in source_contracts):
+    raise SystemExit("OAuth user JSON decoding must reject duplicate nested members.")
+if source.count("consumeUniqueJSONValue(decoder, depth+1)") != 2:
+    raise SystemExit("OAuth duplicate-member scanning must recurse through objects and arrays.")
+
+decode = source[source.index("func decodeOAuthUserResponse("):source.index("func rejectDuplicateJSONMembers(")]
+duplicate_check = decode.find("rejectDuplicateJSONMembers(body)")
+typed_decode = decode.find("json.Unmarshal(body, wrapper)")
+if duplicate_check < 0 or typed_decode < 0 or duplicate_check >= typed_decode:
+    raise SystemExit("OAuth duplicate-member validation must precede typed identity decoding.")
+
+test_contracts = (
+    "TestDecodeOAuthUserResponseRejectsDuplicateJSONMembers",
+    '\"response\":{\"user\":{\"id\":\"user-1\"}},\"response\":',
+    '\"user\":{\"id\":\"user-1\"},\"user\":',
+    '\"id\":\"user-1\",\"id\":\"user-2\"',
+    '\"value\":1,\"value\":2',
+    "errors.Is(err, errOAuthUserResponseDuplicateKey)",
+    "TestDecodeOAuthUserResponseAcceptsUniqueUnknownNestedMembers",
+)
+if any(contract not in tests for contract in test_contracts):
+    raise SystemExit("OAuth duplicate-member regressions must cover response, user, and identity fields.")
+PY
+
+if ! grep -Fq 'rejects duplicate object member names at every nesting' "$ROOT_DIR/README.md" || \
+  ! grep -Fq 'reject duplicate member names before' "$ROOT_DIR/SECURITY.md" || \
+  ! grep -Fq 'Reject duplicate OAuth user-profile JSON member names' "$ROOT_DIR/VISION.md" || \
+  ! grep -Fq 'Rejected duplicate OAuth user-profile JSON members' "$ROOT_DIR/CHANGES.md" || \
+  ! grep -Fq 'Reject duplicate OAuth user-profile JSON member names at every object nesting' "$ROOT_DIR/AGENTS.md"; then
+  printf '%s\n' "Project docs must preserve OAuth duplicate JSON member rejection." >&2
+  exit 1
+fi
+
+python3 - "$OAUTH_USER_DUPLICATE_JSON_PLAN" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+plan = Path(sys.argv[1]).read_text()
+frontmatter = plan.split("---", 2)[1]
+statuses = re.findall(r"^status: .+$", frontmatter, flags=re.MULTILINE)
+required = (
+    "repository-root and external-directory `make check`",
+    "`go test -race -count=1 ./...` passed",
+    "`go vet ./...` passed",
+    "Seven isolated hostile mutations were rejected",
+    "No live OAuth callback was executed",
+)
+if statuses != ["status: completed"] or any(item not in plan for item in required):
+    raise SystemExit(
+        "OAuth duplicate JSON member plan must record completed verification."
+    )
+PY
+
+python3 - "$ROOT_DIR/auth.go" "$ROOT_DIR/auth_test.go" <<'PY'
+import sys
+from pathlib import Path
+
+source = Path(sys.argv[1]).read_text()
+tests = Path(sys.argv[2]).read_text()
+
+source_contracts = (
+    'func foldJSONMemberName(name string) string',
+    'unicode.SimpleFold(r)',
+    'foldedKey := foldJSONMemberName(key)',
+    'if _, exists := members[foldedKey]; exists {',
+    'members[foldedKey] = struct{}{}',
+)
+if any(contract not in source for contract in source_contracts):
+    raise SystemExit("OAuth duplicate-member scanning must match encoding/json case folding.")
+
+test_contracts = (
+    '"case-folded response"',
+    '"case-folded user"',
+    '"case-folded id"',
+    '"Unicode fold"',
+    '\\u212a',
+)
+if any(contract not in tests for contract in test_contracts):
+    raise SystemExit("OAuth duplicate-member regressions must cover ASCII and Unicode case folds.")
+PY
+
+if ! grep -Fq 'including case-folded names' "$ROOT_DIR/README.md" || \
+  ! grep -Fq 'case-folded names' "$ROOT_DIR/SECURITY.md" || \
+  ! grep -Fq 'including case-folded aliases' "$ROOT_DIR/VISION.md" || \
+  ! grep -Fq 'Rejected case-folded duplicate OAuth user-profile JSON members' "$ROOT_DIR/CHANGES.md" || \
+  ! grep -Fq 'including case-folded aliases' "$ROOT_DIR/AGENTS.md"; then
+  printf '%s\n' "Project docs must preserve decoder-aligned OAuth duplicate-member rejection." >&2
+  exit 1
+fi
+
+python3 - "$OAUTH_USER_CASE_FOLDED_JSON_PLAN" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+plan = Path(sys.argv[1]).read_text()
+frontmatter = plan.split("---", 2)[1]
+statuses = re.findall(r"^status: .+$", frontmatter, flags=re.MULTILINE)
+required = (
+    "repository-root and external-directory `make check`",
+    "`go test -race -count=1 ./...` passed",
+    "`go vet ./...` passed",
+    "isolated hostile mutations were rejected",
+    "No live OAuth callback was executed",
+)
+if statuses != ["status: completed"] or any(item not in plan for item in required):
+    raise SystemExit(
+        "OAuth case-folded JSON member plan must record completed verification."
+    )
+PY
+
+python3 - "$ROOT_DIR/fsq/api.go" "$ROOT_DIR/fsq/api_test.go" <<'PY'
+import sys
+from pathlib import Path
+
+source = Path(sys.argv[1]).read_text()
+tests = Path(sys.argv[2]).read_text()
+
+source_contracts = (
+    '"unicode/utf8"',
+    'errFoursquareResponseInvalidUTF8',
+    'errors.New("foursquare response body was not valid UTF-8")',
+    'if !utf8.Valid(data) {',
+    'return errFoursquareResponseInvalidUTF8',
+)
+if any(contract not in source for contract in source_contracts):
+    raise SystemExit("Foursquare API responses must reject malformed UTF-8 before JSON decoding.")
+
+decode = source[source.index("func decodeFoursquareResponse"):]
+size_check = decode.find("len(data) > maxFoursquareResponseBytes")
+utf8_check = decode.find("utf8.Valid(data)")
+envelope_decode = decode.find("json.Unmarshal(data, response)")
+if min(size_check, utf8_check, envelope_decode) < 0 or not size_check < utf8_check < envelope_decode:
+    raise SystemExit("Foursquare API response size and UTF-8 checks must precede envelope decoding.")
+
+test_contracts = (
+    "TestDecodeFoursquareResponseRejectsInvalidUTF8",
+    'name: "venue value"',
+    'name: "member name"',
+    "errors.Is(err, errFoursquareResponseInvalidUTF8)",
+    "TestDecodeFoursquareResponseAcceptsValidUnicode",
+    '"Café 東京"',
+    "TestDecodeFoursquareResponsePrefersTooLargeOverInvalidUTF8",
+)
+if any(contract not in tests for contract in test_contracts):
+    raise SystemExit("Foursquare API UTF-8 regressions must cover malformed values, names, valid Unicode, and size precedence.")
+PY
+
+if ! grep -Fq 'valid UTF-8 before envelope' "$ROOT_DIR/README.md" || \
+  ! grep -Fq 'valid UTF-8 before envelope' "$ROOT_DIR/SECURITY.md" || \
+  ! grep -Fq 'Reject malformed UTF-8 Foursquare JSON response bodies' "$ROOT_DIR/VISION.md" || \
+  ! grep -Fq 'Rejected malformed UTF-8 Foursquare venue and search response bodies' "$ROOT_DIR/CHANGES.md" || \
+  ! grep -Fq 'Reject malformed UTF-8 Foursquare venue/search response bodies' "$ROOT_DIR/AGENTS.md"; then
+  printf '%s\n' "Project docs must preserve Foursquare API response UTF-8 rejection." >&2
+  exit 1
+fi
+
+python3 - "$API_VALID_UTF8_PLAN" <<'PY'
+import sys
+from pathlib import Path
+
+plan = " ".join(Path(sys.argv[1]).read_text().split())
+required = (
+    "status: completed",
+    "R1. General Foursquare JSON bodies must be valid UTF-8",
+    "KTD2. Keep the existing size-limit precedence",
+    "Reject malformed bytes inside a venue value",
+    "moving it after unmarshal",
+    "`go test -race -count=1 ./...`, `go vet ./...`, and `go mod tidy -diff` passed",
+    "Five isolated hostile mutations were rejected",
+    "Push run `27685041221`",
+    "pull-request run `27685069673`",
+    "`5660b6fa515fdaef1d99cf2e838a9015cfbcc62c`",
+    "No live Foursquare request",
+)
+if any(item not in plan for item in required):
+    raise SystemExit("Foursquare API UTF-8 plan must preserve requirements and completed exact-head verification evidence.")
+PY
+
+python3 - "$GO_SECURITY_PLAN" <<'PY'
+import sys
+from pathlib import Path
+
+plan = " ".join(Path(sys.argv[1]).read_text().split())
+required = (
+    "status: completed",
+    "Go 1.25.11",
+    "18 reachable vulnerabilities",
+    "`go test -race -count=1 ./...`",
+    "`govulncheck` reported no reachable vulnerabilities",
+    "Five isolated hostile mutations were rejected",
+    "Push run `27732254902`",
+    "pull-request run `27732263286`",
+    "`b96855dd8eb4b2271577c0bbfa2c615e07b06a5b`",
+)
+if any(item not in plan for item in required):
+    raise SystemExit("Go security plan must preserve completed local, vulnerability, and hosted verification evidence.")
+PY
+
+python3 - "$PROTOBUF_SECURITY_PLAN" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+plan = Path(sys.argv[1]).read_text()
+normalized = " ".join(plan.split())
+required = (
+    "status: completed",
+    "GO-2024-2611",
+    "`github.com/golang/protobuf` v1.5.4",
+    "`google.golang.org/protobuf` v1.36.11",
+    "`govulncheck -show verbose ./...` reported `No vulnerabilities found.`",
+    "Eight isolated Git-backed mutations were rejected",
+    "Push run `27756036452`",
+    "pull-request run `27756048496`",
+    "`de1f0de166985d3f1c4ab855eb9e1ea60b488c4f`",
+)
+verification = plan.split("## Verification Completed", 1)[-1]
+if (
+    any(item not in normalized for item in required)
+    or re.search(r"\b(?:pending|todo|tbd|not run|not yet)\b", verification, re.IGNORECASE)
+):
+    raise SystemExit("Protobuf security plan must preserve completed local, module, mutation, and hosted verification evidence.")
+PY
 
 printf '%s\n' "fsq-go-explore Go baseline checks passed."
