@@ -49,6 +49,8 @@ Current baseline:
 - OAuth user-profile identities require canonical nonempty IDs before session publication.
 - Reject duplicate OAuth user-profile JSON member names before typed identity
   decoding and session publication, including case-folded aliases.
+- Reject malformed UTF-8 OAuth user-profile bodies before JSON parsing or
+  session publication.
 - Auth cookies validate generated user cache keys before access-token memcache
   lookup starts.
 - Protected routes validate generated auth cookie cache keys before handler
@@ -63,6 +65,8 @@ Current baseline:
   lookup, or Foursquare edit API work.
 - Foursquare JSON response parsing is limited to 2 MiB before envelope or
   venue decoding.
+- Reject malformed UTF-8 Foursquare JSON response bodies before envelope or
+  venue decoding while preserving valid Unicode venue data.
 - Non-2xx Foursquare search and venue detail responses are rejected before decoding
   so upstream error envelopes cannot become successful venue data.
 - Venue edit responses reject non-2xx status before a bounded discard of
@@ -102,6 +106,7 @@ Next priorities:
   edit API calls
 - Keep venue edit request bodies bounded before parsing or auth work
 - Keep Foursquare response bodies bounded before JSON parsing
+- Keep raw Foursquare JSON response UTF-8 validation ahead of envelope decoding
 - Keep non-2xx Foursquare search and venue detail responses out of JSON decoding
 - Keep venue edit response status checks ahead of bounded body disposal
 - Keep final Foursquare response endpoint checks ahead of response reads
