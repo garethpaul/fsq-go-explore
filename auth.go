@@ -2,17 +2,21 @@
 package app
 
 import (
+	"bytes"
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"io"
 	"log"
+	"mime"
 	"net/http"
 	"net/url"
 	"os"
 	"strings"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/garethpaul/fsq-go-explore/fsq"
 	"golang.org/x/oauth2"
@@ -42,11 +46,20 @@ var (
 const (
 	userCacheKeyPrefix        = "user:"
 	maxOAuthUserResponseBytes = 1 * 1024 * 1024
+	oauthUserRequestTimeout   = 10 * time.Second
+	oauthUserResponseHost     = "api.foursquare.com"
+	oauthUserResponsePath     = "/v2/users/self"
 )
 
 var (
-	errOAuthUserResponseStatus   = errors.New("foursquare user response status was not successful")
-	errOAuthUserResponseTooLarge = errors.New("foursquare user response exceeded the size limit")
+	errOAuthUserResponseStatus        = errors.New("foursquare user response status was not successful")
+	errOAuthUserResponseOrigin        = errors.New("foursquare user response origin was not expected")
+	errOAuthUserResponseMediaType     = errors.New("foursquare user response media type was not JSON")
+	errOAuthUserResponseTooLarge      = errors.New("foursquare user response exceeded the size limit")
+	errOAuthUserResponseIdentity      = errors.New("foursquare user response identity was invalid")
+	errOAuthUserResponseInvalidUTF8   = errors.New("foursquare user response was not valid UTF-8")
+	errOAuthUserResponseDuplicateKey  = errors.New("foursquare user response contained a duplicate JSON member")
+	errOAuthUserResponseJSONStructure = errors.New("foursquare user response JSON structure was invalid")
 )
 
 func newOAuthState() (string, error) {
@@ -226,6 +239,12 @@ func decodeOAuthUserResponse(response *http.Response) (*fsq.UserResponse, error)
 	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
 		return nil, errOAuthUserResponseStatus
 	}
+	if !isExpectedOAuthUserResponseURL(response) {
+		return nil, errOAuthUserResponseOrigin
+	}
+	if !isOAuthUserJSONResponse(response) {
+		return nil, errOAuthUserResponseMediaType
+	}
 
 	body, err := io.ReadAll(io.LimitReader(response.Body, maxOAuthUserResponseBytes+1))
 	if err != nil {
@@ -233,6 +252,12 @@ func decodeOAuthUserResponse(response *http.Response) (*fsq.UserResponse, error)
 	}
 	if len(body) > maxOAuthUserResponseBytes {
 		return nil, errOAuthUserResponseTooLarge
+	}
+	if !utf8.Valid(body) {
+		return nil, errOAuthUserResponseInvalidUTF8
+	}
+	if err := rejectDuplicateJSONMembers(body); err != nil {
+		return nil, err
 	}
 
 	wrapper := new(fsq.Response)
@@ -243,7 +268,128 @@ func decodeOAuthUserResponse(response *http.Response) (*fsq.UserResponse, error)
 	if err := json.Unmarshal(wrapper.Response, user); err != nil {
 		return nil, err
 	}
+	if user.User.ID == "" || user.User.ID != strings.TrimSpace(user.User.ID) {
+		return nil, errOAuthUserResponseIdentity
+	}
 	return user, nil
+}
+
+func rejectDuplicateJSONMembers(body []byte) error {
+	decoder := json.NewDecoder(bytes.NewReader(body))
+	decoder.UseNumber()
+	if err := consumeUniqueJSONValue(decoder, 0); err != nil {
+		return err
+	}
+	if _, err := decoder.Token(); err != io.EOF {
+		if err == nil {
+			return errOAuthUserResponseJSONStructure
+		}
+		return err
+	}
+	return nil
+}
+
+// foldJSONMemberName mirrors encoding/json's case-insensitive field matching.
+func foldJSONMemberName(name string) string {
+	return strings.Map(func(r rune) rune {
+		for {
+			folded := unicode.SimpleFold(r)
+			if folded <= r {
+				return folded
+			}
+			r = folded
+		}
+	}, name)
+}
+
+func consumeUniqueJSONValue(decoder *json.Decoder, depth int) error {
+	if depth > 10000 {
+		return errOAuthUserResponseJSONStructure
+	}
+
+	token, err := decoder.Token()
+	if err != nil {
+		return err
+	}
+	delimiter, ok := token.(json.Delim)
+	if !ok {
+		return nil
+	}
+
+	switch delimiter {
+	case '{':
+		members := make(map[string]struct{})
+		for decoder.More() {
+			keyToken, err := decoder.Token()
+			if err != nil {
+				return err
+			}
+			key, ok := keyToken.(string)
+			if !ok {
+				return errOAuthUserResponseJSONStructure
+			}
+			foldedKey := foldJSONMemberName(key)
+			if _, exists := members[foldedKey]; exists {
+				return errOAuthUserResponseDuplicateKey
+			}
+			members[foldedKey] = struct{}{}
+			if err := consumeUniqueJSONValue(decoder, depth+1); err != nil {
+				return err
+			}
+		}
+		closing, err := decoder.Token()
+		if err != nil {
+			return err
+		}
+		if closing != json.Delim('}') {
+			return errOAuthUserResponseJSONStructure
+		}
+	case '[':
+		for decoder.More() {
+			if err := consumeUniqueJSONValue(decoder, depth+1); err != nil {
+				return err
+			}
+		}
+		closing, err := decoder.Token()
+		if err != nil {
+			return err
+		}
+		if closing != json.Delim(']') {
+			return errOAuthUserResponseJSONStructure
+		}
+	default:
+		return errOAuthUserResponseJSONStructure
+	}
+
+	return nil
+}
+
+func isExpectedOAuthUserResponseURL(response *http.Response) bool {
+	if response == nil || response.Request == nil || response.Request.URL == nil {
+		return false
+	}
+
+	responseURL := response.Request.URL
+	return responseURL.Scheme == "https" &&
+		strings.EqualFold(responseURL.Hostname(), oauthUserResponseHost) &&
+		responseURL.User == nil &&
+		responseURL.Port() == "" &&
+		responseURL.EscapedPath() == oauthUserResponsePath &&
+		responseURL.Fragment == ""
+}
+
+func isOAuthUserJSONResponse(response *http.Response) bool {
+	contentTypes := response.Header.Values("Content-Type")
+	if len(contentTypes) != 1 {
+		return false
+	}
+	mediaType, _, err := mime.ParseMediaType(contentTypes[0])
+	if err != nil {
+		return false
+	}
+	mediaType = strings.ToLower(mediaType)
+	return mediaType == "application/json" ||
+		(strings.HasPrefix(mediaType, "application/") && strings.HasSuffix(mediaType, "+json"))
 }
 
 // Process a request and cache using headers.
@@ -273,5 +419,9 @@ func Logout(w http.ResponseWriter, r *http.Request) {
 }
 
 func getHttpClient(r *http.Request) http.Client {
-	return http.Client{Transport: &urlfetch.Transport{Context: appengine.NewContext(r)}}
+	return http.Client{
+		Transport:     &urlfetch.Transport{Context: appengine.NewContext(r)},
+		CheckRedirect: fsq.RefuseRedirect,
+		Timeout:       oauthUserRequestTimeout,
+	}
 }
