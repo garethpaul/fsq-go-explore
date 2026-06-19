@@ -35,7 +35,10 @@ Additional scan context:
 ### Prerequisites
 
 - Git
-- Go 1.25 or a compatible modern Go toolchain
+- Go 1.25.11 or newer, including the maintained standard-library security fixes
+- The reviewed App Engine graph resolves `github.com/golang/protobuf` v1.5.4
+  and `google.golang.org/protobuf` v1.36.11; run the full baseline after module
+  changes so vulnerable transitive protobuf releases cannot return unnoticed.
 
 ### Setup
 

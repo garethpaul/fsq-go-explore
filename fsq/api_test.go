@@ -109,6 +109,15 @@ func TestFoursquareJSONResponseMediaTypes(t *testing.T) {
 	}
 }
 
+func TestFoursquareJSONResponseRejectsMultipleContentTypes(t *testing.T) {
+	response := testResponse(`{"response":{}}`)
+	response.Header.Add("Content-Type", "text/html")
+
+	if isFoursquareJSONResponse(response) {
+		t.Fatal("isFoursquareJSONResponse with multiple Content-Type fields = true, want false")
+	}
+}
+
 func TestExpectedFoursquareResponseURL(t *testing.T) {
 	tests := []struct {
 		name         string

@@ -30,6 +30,8 @@ OAUTH_USER_DUPLICATE_JSON_PLAN="$ROOT_DIR/docs/plans/2026-06-15-oauth-user-dupli
 OAUTH_USER_CASE_FOLDED_JSON_PLAN="$ROOT_DIR/docs/plans/2026-06-15-oauth-user-case-folded-json-members.md"
 OAUTH_USER_VALID_UTF8_PLAN="$ROOT_DIR/docs/plans/2026-06-17-oauth-user-valid-utf8.md"
 API_VALID_UTF8_PLAN="$ROOT_DIR/docs/plans/2026-06-17-001-fix-foursquare-api-valid-utf8-plan.md"
+GO_SECURITY_PLAN="$ROOT_DIR/docs/plans/2026-06-18-go-1-25-11-security-refresh.md"
+PROTOBUF_SECURITY_PLAN="$ROOT_DIR/docs/plans/2026-06-18-protobuf-security-refresh.md"
 LOCATION_INDEPENDENT_MAKE_PLAN="$ROOT_DIR/docs/plans/2026-06-13-location-independent-make.md"
 RESPONSE_CONTENT_TYPE_PLAN="$ROOT_DIR/docs/plans/2026-06-14-fsq-response-content-type.md"
 VENUE_EDIT_RESPONSE_PLAN="$ROOT_DIR/docs/plans/2026-06-14-fsq-venue-edit-response-boundary.md"
@@ -89,6 +91,8 @@ for path in \
   "docs/plans/2026-06-15-oauth-user-case-folded-json-members.md" \
   "docs/plans/2026-06-17-oauth-user-valid-utf8.md" \
   "docs/plans/2026-06-17-001-fix-foursquare-api-valid-utf8-plan.md" \
+  "docs/plans/2026-06-18-go-1-25-11-security-refresh.md" \
+  "docs/plans/2026-06-18-protobuf-security-refresh.md" \
   "docs/plans/2026-06-12-fsq-rate-limiter-refill.md" \
   "docs/plans/2026-06-12-fsq-edit-body-limit.md" \
   "docs/plans/2026-06-13-fsq-response-body-limit.md" \
@@ -220,6 +224,31 @@ if any(item not in tests for item in required_tests):
 PY
 
 if command -v go >/dev/null 2>&1; then
+  python3 - "$ROOT_DIR/go.mod" "$(cd "$ROOT_DIR" && go env GOVERSION)" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+go_mod_path, runtime = sys.argv[1:]
+go_mod = Path(go_mod_path).read_text()
+match = re.search(r"^go ([0-9]+\.[0-9]+\.[0-9]+)$", go_mod, re.MULTILINE)
+if match is None or match.group(1) != "1.25.11":
+    raise SystemExit("go.mod must require the patched Go 1.25.11 toolchain")
+
+runtime_match = re.fullmatch(r"go([0-9]+)\.([0-9]+)(?:\.([0-9]+))?", runtime)
+if runtime_match is None:
+    raise SystemExit("Unable to parse Go runtime version: " + runtime)
+runtime_version = tuple(int(value or 0) for value in runtime_match.groups())
+if runtime_version < (1, 25, 11):
+    raise SystemExit("Go 1.25.11 or newer is required for standard-library security fixes")
+
+required_modules = (
+    "github.com/golang/protobuf v1.5.4 // indirect",
+    "google.golang.org/protobuf v1.36.11 // indirect",
+)
+if any(go_mod.count(module) != 1 for module in required_modules):
+    raise SystemExit("go.mod must retain the reviewed protobuf compatibility and runtime versions")
+PY
   unformatted=$(find "$ROOT_DIR" -name '*.go' -not -path "$ROOT_DIR/.git/*" -print | xargs gofmt -l)
   if [ -n "$unformatted" ]; then
     printf '%s\n' "Go files need gofmt:" >&2
@@ -655,6 +684,21 @@ if ! grep -Fq "Malformed venue edit forms should be rejected" "$ROOT_DIR/SECURIT
   ! grep -Fq "least-recently-used" "$ROOT_DIR/SECURITY.md" ||
   ! grep -Fq 'refill `Max` requests over `TTL`' "$ROOT_DIR/SECURITY.md"; then
   printf '%s\n' "SECURITY must document the malformed venue edit form boundary." >&2
+  exit 1
+fi
+
+if ! grep -Fq "Go 1.25.11 or newer" "$ROOT_DIR/README.md" || \
+  ! grep -Fq "Build and test this repository with Go 1.25.11 or newer" "$ROOT_DIR/SECURITY.md" || \
+  ! grep -Fq "Use Go 1.25.11 or newer" "$ROOT_DIR/AGENTS.md"; then
+  printf '%s\n' "Project guidance must retain the patched Go toolchain boundary." >&2
+  exit 1
+fi
+
+if ! grep -Fq '`google.golang.org/protobuf` v1.36.11' "$ROOT_DIR/README.md" || \
+  ! grep -Fq '`google.golang.org/protobuf` v1.36.11' "$ROOT_DIR/SECURITY.md" || \
+  ! grep -Fq '`google.golang.org/protobuf` v1.36.11' "$ROOT_DIR/AGENTS.md" || \
+  ! grep -Fq "Refreshed the transitive protobuf compatibility layer" "$ROOT_DIR/CHANGES.md"; then
+  printf '%s\n' "Project guidance must retain the reviewed protobuf dependency boundary." >&2
   exit 1
 fi
 
@@ -1354,6 +1398,52 @@ required = (
 )
 if any(item not in plan for item in required):
     raise SystemExit("Foursquare API UTF-8 plan must preserve requirements and completed exact-head verification evidence.")
+PY
+
+python3 - "$GO_SECURITY_PLAN" <<'PY'
+import sys
+from pathlib import Path
+
+plan = " ".join(Path(sys.argv[1]).read_text().split())
+required = (
+    "status: completed",
+    "Go 1.25.11",
+    "18 reachable vulnerabilities",
+    "`go test -race -count=1 ./...`",
+    "`govulncheck` reported no reachable vulnerabilities",
+    "Five isolated hostile mutations were rejected",
+    "Push run `27732254902`",
+    "pull-request run `27732263286`",
+    "`b96855dd8eb4b2271577c0bbfa2c615e07b06a5b`",
+)
+if any(item not in plan for item in required):
+    raise SystemExit("Go security plan must preserve completed local, vulnerability, and hosted verification evidence.")
+PY
+
+python3 - "$PROTOBUF_SECURITY_PLAN" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+plan = Path(sys.argv[1]).read_text()
+normalized = " ".join(plan.split())
+required = (
+    "status: completed",
+    "GO-2024-2611",
+    "`github.com/golang/protobuf` v1.5.4",
+    "`google.golang.org/protobuf` v1.36.11",
+    "`govulncheck -show verbose ./...` reported `No vulnerabilities found.`",
+    "Eight isolated Git-backed mutations were rejected",
+    "Push run `27756036452`",
+    "pull-request run `27756048496`",
+    "`de1f0de166985d3f1c4ab855eb9e1ea60b488c4f`",
+)
+verification = plan.split("## Verification Completed", 1)[-1]
+if (
+    any(item not in normalized for item in required)
+    or re.search(r"\b(?:pending|todo|tbd|not run|not yet)\b", verification, re.IGNORECASE)
+):
+    raise SystemExit("Protobuf security plan must preserve completed local, module, mutation, and hosted verification evidence.")
 PY
 
 printf '%s\n' "fsq-go-explore Go baseline checks passed."
