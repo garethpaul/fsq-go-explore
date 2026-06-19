@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"golang.org/x/oauth2"
 )
@@ -28,6 +29,11 @@ const (
 )
 
 var errFoursquareResponseTooLarge = errors.New("foursquare response body exceeds 2 MiB")
+var errFoursquareResponseInvalidUTF8 = errors.New("foursquare response body was not valid UTF-8")
+
+func RefuseRedirect(_ *http.Request, _ []*http.Request) error {
+	return http.ErrUseLastResponse
+}
 
 func successfulFoursquareStatus(statusCode int) bool {
 	return statusCode >= http.StatusOK && statusCode < http.StatusMultipleChoices
@@ -48,7 +54,11 @@ func isExpectedFoursquareResponseURL(response *http.Response, expectedEscapedPat
 }
 
 func isFoursquareJSONResponse(response *http.Response) bool {
-	mediaType, _, err := mime.ParseMediaType(response.Header.Get("Content-Type"))
+	contentTypes := response.Header.Values("Content-Type")
+	if len(contentTypes) != 1 {
+		return false
+	}
+	mediaType, _, err := mime.ParseMediaType(contentTypes[0])
 	if err != nil {
 		return false
 	}
@@ -90,6 +100,7 @@ func NewFoursquareService(config *FoursquareConfig) *FoursquareService {
 	if client.Timeout <= 0 {
 		client.Timeout = foursquareRequestTimeout
 	}
+	client.CheckRedirect = RefuseRedirect
 	serviceConfig.Client = client
 	return &FoursquareService{Config: &serviceConfig}
 }
@@ -227,6 +238,9 @@ func decodeFoursquareResponse(body io.Reader, target interface{}) error {
 	}
 	if len(data) > maxFoursquareResponseBytes {
 		return errFoursquareResponseTooLarge
+	}
+	if !utf8.Valid(data) {
+		return errFoursquareResponseInvalidUTF8
 	}
 	response := new(Response)
 	if err := json.Unmarshal(data, response); err != nil {
