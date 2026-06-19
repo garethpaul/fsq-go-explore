@@ -53,6 +53,8 @@ endpoints, and non-JSON media types before body reads and enforce a 1 MiB limit
 before JSON decoding or session creation.
 OAuth user-profile responses must contain exactly one JSON `Content-Type` field
 before any response-body read.
+Foursquare API responses must also contain exactly one JSON `Content-Type` field
+before any response-body read.
 Foursquare API and OAuth user clients must refuse redirects before
 credential-bearing query parameters can be forwarded to another destination.
 OAuth user-profile requests must use a 10-second end-to-end timeout in addition

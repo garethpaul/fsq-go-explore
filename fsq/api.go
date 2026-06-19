@@ -54,7 +54,11 @@ func isExpectedFoursquareResponseURL(response *http.Response, expectedEscapedPat
 }
 
 func isFoursquareJSONResponse(response *http.Response) bool {
-	mediaType, _, err := mime.ParseMediaType(response.Header.Get("Content-Type"))
+	contentTypes := response.Header.Values("Content-Type")
+	if len(contentTypes) != 1 {
+		return false
+	}
+	mediaType, _, err := mime.ParseMediaType(contentTypes[0])
 	if err != nil {
 		return false
 	}

@@ -51,6 +51,7 @@
   non-JSON media types before reads; cap accepted profile bodies at 1 MiB before
   decoding.
 - Require exactly one OAuth user-profile `Content-Type` field before reads.
+- Require exactly one Foursquare API `Content-Type` field before reads.
 - Keep OAuth user-profile requests bounded by a 10-second end-to-end timeout.
 - Reject missing, empty, or edge-whitespace OAuth user IDs before access-token caching or cookie publication.
 - Reject duplicate OAuth user-profile JSON member names at every object nesting
