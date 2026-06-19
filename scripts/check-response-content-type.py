@@ -10,7 +10,9 @@ plan = Path(sys.argv[3]).read_text(encoding="utf-8")
 required_source = [
     '"mime"',
     "func isFoursquareJSONResponse(response *http.Response) bool",
-    'mime.ParseMediaType(response.Header.Get("Content-Type"))',
+    'contentTypes := response.Header.Values("Content-Type")',
+    "if len(contentTypes) != 1",
+    "mime.ParseMediaType(contentTypes[0])",
     'mediaType == "application/json"',
     'strings.HasSuffix(mediaType, "+json")',
 ]
@@ -34,6 +36,8 @@ required_tests = [
     "func TestFoursquareJSONResponseMediaTypes",
     '"application/vnd.foursquare+json"',
     '"text/html"',
+    "func TestFoursquareJSONResponseRejectsMultipleContentTypes",
+    'response.Header.Add("Content-Type", "text/html")',
     "func TestSearchRejectsNonJSONResponseBeforeDecode",
     "func TestVenueDetailsRejectsNonJSONResponseBeforeDecode",
 ]

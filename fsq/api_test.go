@@ -1,6 +1,7 @@
 package fsq
 
 import (
+	"bytes"
 	"errors"
 	"io"
 	"net/http"
@@ -13,6 +14,31 @@ import (
 type failingReader struct {
 	read bool
 }
+
+type trackingReadCloser struct {
+	readCalls int
+}
+
+func (r *trackingReadCloser) Read([]byte) (int, error) {
+	r.readCalls++
+	return 0, io.EOF
+}
+
+func (r *trackingReadCloser) Close() error { return nil }
+
+type unboundedReadCloser struct {
+	bytesRead int
+}
+
+func (r *unboundedReadCloser) Read(p []byte) (int, error) {
+	for i := range p {
+		p[i] = 'x'
+	}
+	r.bytesRead += len(p)
+	return len(p), nil
+}
+
+func (r *unboundedReadCloser) Close() error { return nil }
 
 var errTestReadFailure = errors.New("read failed")
 
@@ -27,7 +53,11 @@ func (r *failingReader) Read(p []byte) (int, error) {
 type roundTripFunc func(*http.Request) (*http.Response, error)
 
 func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
-	return f(req)
+	response, err := f(req)
+	if response != nil && response.Request == nil {
+		response.Request = req
+	}
+	return response, err
 }
 
 func testResponse(body string) *http.Response {
@@ -79,6 +109,89 @@ func TestFoursquareJSONResponseMediaTypes(t *testing.T) {
 	}
 }
 
+func TestFoursquareJSONResponseRejectsMultipleContentTypes(t *testing.T) {
+	response := testResponse(`{"response":{}}`)
+	response.Header.Add("Content-Type", "text/html")
+
+	if isFoursquareJSONResponse(response) {
+		t.Fatal("isFoursquareJSONResponse with multiple Content-Type fields = true, want false")
+	}
+}
+
+func TestExpectedFoursquareResponseURL(t *testing.T) {
+	tests := []struct {
+		name         string
+		responseURL  string
+		expectedPath string
+		want         bool
+	}{
+		{name: "search", responseURL: "https://api.foursquare.com/v2/venues/search?near=Portland", expectedPath: "/v2/venues/search", want: true},
+		{name: "escaped venue", responseURL: "https://api.foursquare.com/v2/venues/venue%2F123?v=20260614", expectedPath: "/v2/venues/venue%2F123", want: true},
+		{name: "http", responseURL: "http://api.foursquare.com/v2/venues/search", expectedPath: "/v2/venues/search"},
+		{name: "different host", responseURL: "https://example.com/v2/venues/search", expectedPath: "/v2/venues/search"},
+		{name: "userinfo", responseURL: "https://user@api.foursquare.com/v2/venues/search", expectedPath: "/v2/venues/search"},
+		{name: "port", responseURL: "https://api.foursquare.com:443/v2/venues/search", expectedPath: "/v2/venues/search"},
+		{name: "different path", responseURL: "https://api.foursquare.com/v2/venues/explore", expectedPath: "/v2/venues/search"},
+		{name: "fragment", responseURL: "https://api.foursquare.com/v2/venues/search#result", expectedPath: "/v2/venues/search"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			responseURL, err := url.Parse(tt.responseURL)
+			if err != nil {
+				t.Fatalf("url.Parse(%q): %v", tt.responseURL, err)
+			}
+			response := &http.Response{Request: &http.Request{URL: responseURL}}
+			if got := isExpectedFoursquareResponseURL(response, tt.expectedPath); got != tt.want {
+				t.Fatalf("isExpectedFoursquareResponseURL(%q, %q) = %t, want %t", tt.responseURL, tt.expectedPath, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestFoursquareOperationsRejectUnexpectedFinalURLBeforeRead(t *testing.T) {
+	tests := []struct {
+		name string
+		call func(*FoursquareService)
+	}{
+		{name: "search", call: func(service *FoursquareService) {
+			service.Search(&VenueSearchRequest{Near: "Portland", Query: "coffee"})
+		}},
+		{name: "venue details", call: func(service *FoursquareService) {
+			service.VenueDetails("venue-1")
+		}},
+		{name: "venue edit", call: func(service *FoursquareService) {
+			service.VenueEdit("venue-1", url.Values{"name": []string{"New Name"}})
+		}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			body := &trackingReadCloser{}
+			unexpectedURL, err := url.Parse("https://example.com/v2/venues/search")
+			if err != nil {
+				t.Fatalf("url.Parse: %v", err)
+			}
+			service := NewFoursquareService(&FoursquareConfig{
+				ClientId: "client-id", ClientSecret: "client-secret", AccessToken: "token", Version: "20260614",
+				Client: http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+					return &http.Response{
+						StatusCode: http.StatusOK,
+						Body:       body,
+						Header:     http.Header{"Content-Type": []string{"application/json"}},
+						Request:    &http.Request{URL: unexpectedURL},
+					}, nil
+				})},
+			})
+
+			tt.call(service)
+			if body.readCalls != 0 {
+				t.Fatalf("response body reads = %d, want 0", body.readCalls)
+			}
+		})
+	}
+}
+
 func TestSearchRejectsNonJSONResponseBeforeDecode(t *testing.T) {
 	service := NewFoursquareService(&FoursquareConfig{
 		ClientId: "client-id", ClientSecret: "client-secret", Version: "20260614",
@@ -125,6 +238,31 @@ func TestNewFoursquareServicePreservesExplicitClientTimeout(t *testing.T) {
 
 	if service.Config.Client.Timeout != explicitTimeout {
 		t.Fatalf("client timeout = %s, want %s", service.Config.Client.Timeout, explicitTimeout)
+	}
+}
+
+func TestNewFoursquareServiceRefusesRedirects(t *testing.T) {
+	transport := roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		return testResponse(`{"response":{}}`), nil
+	})
+	originalRedirect := func(req *http.Request, via []*http.Request) error { return nil }
+	config := &FoursquareConfig{
+		Client: http.Client{
+			Transport:     transport,
+			Timeout:       3 * time.Second,
+			CheckRedirect: originalRedirect,
+		},
+	}
+
+	service := NewFoursquareService(config)
+	if err := service.Config.Client.CheckRedirect(nil, nil); !errors.Is(err, http.ErrUseLastResponse) {
+		t.Fatalf("service redirect policy error = %v, want http.ErrUseLastResponse", err)
+	}
+	if service.Config.Client.Transport == nil || service.Config.Client.Timeout != 3*time.Second {
+		t.Fatal("service redirect policy must preserve caller transport and timeout")
+	}
+	if err := config.Client.CheckRedirect(nil, nil); err != nil {
+		t.Fatalf("caller redirect policy was mutated: %v", err)
 	}
 }
 
@@ -229,6 +367,60 @@ func TestVenueEditEscapesVenueIDAndSendsForm(t *testing.T) {
 	}
 }
 
+func TestVenueEditRejectsNonSuccessBeforeRead(t *testing.T) {
+	for _, status := range []int{http.StatusContinue, http.StatusMultipleChoices, http.StatusInternalServerError} {
+		body := &trackingReadCloser{}
+		service := NewFoursquareService(&FoursquareConfig{
+			AccessToken: "token",
+			Version:     "20260614",
+			Client: http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+				return &http.Response{StatusCode: status, Body: body, Header: make(http.Header)}, nil
+			})},
+		})
+
+		service.VenueEdit("venue-1", url.Values{"name": []string{"New Name"}})
+		if body.readCalls != 0 {
+			t.Fatalf("VenueEdit status %d body reads = %d, want 0", status, body.readCalls)
+		}
+	}
+}
+
+func TestVenueEditBoundsSuccessfulResponseBody(t *testing.T) {
+	body := &unboundedReadCloser{}
+	service := NewFoursquareService(&FoursquareConfig{
+		AccessToken: "token",
+		Version:     "20260614",
+		Client: http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+			return &http.Response{StatusCode: http.StatusOK, Body: body, Header: make(http.Header)}, nil
+		})},
+	})
+
+	service.VenueEdit("venue-1", url.Values{"name": []string{"New Name"}})
+	if body.bytesRead != maxFoursquareResponseBytes+1 {
+		t.Fatalf("VenueEdit body bytes read = %d, want %d", body.bytesRead, maxFoursquareResponseBytes+1)
+	}
+}
+
+func TestDiscardFoursquareResponseAcceptsExactLimit(t *testing.T) {
+	if err := discardFoursquareResponse(strings.NewReader(strings.Repeat("x", maxFoursquareResponseBytes))); err != nil {
+		t.Fatalf("discardFoursquareResponse exact limit: %v", err)
+	}
+}
+
+func TestDiscardFoursquareResponseRejectsOversizeBody(t *testing.T) {
+	err := discardFoursquareResponse(strings.NewReader(strings.Repeat("x", maxFoursquareResponseBytes+1)))
+	if !errors.Is(err, errFoursquareResponseTooLarge) {
+		t.Fatalf("discardFoursquareResponse error = %v, want %v", err, errFoursquareResponseTooLarge)
+	}
+}
+
+func TestDiscardFoursquareResponsePreservesReadError(t *testing.T) {
+	err := discardFoursquareResponse(&failingReader{})
+	if !errors.Is(err, errTestReadFailure) {
+		t.Fatalf("discardFoursquareResponse error = %v, want %v", err, errTestReadFailure)
+	}
+}
+
 func TestDecodeFoursquareResponseAcceptsExactLimit(t *testing.T) {
 	body := `{"response":{}}`
 	body += strings.Repeat(" ", maxFoursquareResponseBytes-len(body))
@@ -263,5 +455,55 @@ func TestDecodeFoursquareResponseRejectsEmptyBody(t *testing.T) {
 func TestDecodeFoursquareResponseRejectsMalformedJSON(t *testing.T) {
 	if err := decodeFoursquareResponse(strings.NewReader(`{"response":`), &VenueSearchResponse{}); err == nil {
 		t.Fatal("decodeFoursquareResponse malformed JSON error = nil, want JSON decode error")
+	}
+}
+
+func TestDecodeFoursquareResponseRejectsInvalidUTF8(t *testing.T) {
+	tests := []struct {
+		name string
+		body []byte
+	}{
+		{
+			name: "venue value",
+			body: []byte("{\"response\":{\"venues\":[{\"name\":\"\xff\"}]}}"),
+		},
+		{
+			name: "member name",
+			body: []byte("{\"response\":{\"venues\":[{\"na\xffme\":\"Cafe\"}]}}"),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			err := decodeFoursquareResponse(bytes.NewReader(test.body), &VenueSearchResponse{})
+			if !errors.Is(err, errFoursquareResponseInvalidUTF8) {
+				t.Fatalf("decodeFoursquareResponse error = %v, want %v", err, errFoursquareResponseInvalidUTF8)
+			}
+		})
+	}
+}
+
+func TestDecodeFoursquareResponseAcceptsValidUnicode(t *testing.T) {
+	body := `{"response":{"venues":[{"name":"Café 東京"}]}}`
+	target := new(VenueSearchResponse)
+
+	if err := decodeFoursquareResponse(strings.NewReader(body), target); err != nil {
+		t.Fatalf("decodeFoursquareResponse valid Unicode: %v", err)
+	}
+	if len(target.Venues) != 1 {
+		t.Fatalf("venue count = %d, want 1", len(target.Venues))
+	}
+	if got := target.Venues[0].Name; got != "Café 東京" {
+		t.Fatalf("venue name = %q, want valid Unicode preserved", got)
+	}
+}
+
+func TestDecodeFoursquareResponsePrefersTooLargeOverInvalidUTF8(t *testing.T) {
+	body := bytes.Repeat([]byte{' '}, maxFoursquareResponseBytes+1)
+	body[len(body)-1] = 0xff
+
+	err := decodeFoursquareResponse(bytes.NewReader(body), &VenueSearchResponse{})
+	if !errors.Is(err, errFoursquareResponseTooLarge) {
+		t.Fatalf("decodeFoursquareResponse error = %v, want %v", err, errFoursquareResponseTooLarge)
 	}
 }
