@@ -35,7 +35,10 @@ Additional scan context:
 ### Prerequisites
 
 - Git
-- Go 1.25 or a compatible modern Go toolchain
+- Go 1.25.11 or newer, including the maintained standard-library security fixes
+- The reviewed App Engine graph resolves `github.com/golang/protobuf` v1.5.4
+  and `google.golang.org/protobuf` v1.36.11; run the full baseline after module
+  changes so vulnerable transitive protobuf releases cannot return unnoticed.
 
 ### Setup
 
@@ -88,6 +91,9 @@ handler code.
 Foursquare JSON response bodies are limited to 2 MiB before envelope or venue
 decoding so an unexpectedly large upstream response cannot grow process memory
 without an application boundary.
+Bounded Foursquare JSON response bodies must also be valid UTF-8 before envelope
+decoding so malformed provider bytes cannot become replacement characters in
+venue names, addresses, or other rendered text.
 Non-2xx Foursquare search and venue detail responses are rejected before JSON decoding,
 so error envelopes cannot populate successful venue result structures.
 Venue edit responses require 2xx status before a bounded 2 MiB discard, so
@@ -97,9 +103,21 @@ HTTPS `api.foursquare.com` operation path before content checks, decoding, or
 successful response disposal; query values remain dynamic and are never logged.
 Foursquare HTTP clients receive a 10-second default end-to-end timeout when
 callers do not provide a positive timeout; explicit positive values are kept.
+Foursquare clients refuse redirects before query credentials or access tokens
+can be forwarded to another destination.
+OAuth user-profile requests use a 10-second end-to-end timeout so stalled
+upstream work cannot hold the callback open indefinitely.
 OAuth user-profile responses require a 2xx status, the exact final HTTPS
-`api.foursquare.com/v2/users/self` endpoint, and a JSON media type before reads;
-accepted bodies are limited to 1 MiB before wrapper or user decoding.
+`api.foursquare.com/v2/users/self` endpoint, and exactly one JSON media-type
+field before reads; accepted bodies are limited to 1 MiB before wrapper or user
+decoding.
+OAuth user-profile identities require a nonempty ID without leading or trailing Unicode whitespace
+before access-token caching or authentication-cookie publication.
+OAuth user-profile JSON rejects duplicate object member names at every nesting
+level before typed identity decoding, including case-folded names that Go maps
+to the same typed field.
+Bounded OAuth user-profile bodies must be valid UTF-8 before JSON tokenization,
+so malformed provider bytes cannot be repaired into session identity data.
 The in-process limiter retains at most 10,000 rate-limiter keys and evicts the
 least recently used key when request-controlled key material reaches that cap.
 Each bucket permits a burst of `Max` requests and refills those `Max` requests
@@ -132,8 +150,8 @@ When the required SDK or runtime is unavailable, use static checks and source re
   validation.
 - OAuth callbacks with matching state still fail before token exchange; missing OAuth authorization codes are rejected.
 - OAuth user-profile responses reject non-2xx statuses, unexpected final
-  endpoints, and non-JSON media types before reads, then enforce a 1 MiB body
-  limit before authentication state is created.
+  endpoints, and missing, duplicate, combined, or non-JSON media types before
+  reads, then enforce a 1 MiB body limit before authentication state is created.
 - Auth cookie values are validated as generated user cache keys before memcache
   lookup, so malformed cookie values do not reach access-token cache work.
 - Protected routes validate generated auth cookie cache keys before handler

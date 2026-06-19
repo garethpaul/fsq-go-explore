@@ -1,6 +1,7 @@
 package app
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -8,6 +9,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/garethpaul/fsq-go-explore/fsq"
 )
@@ -47,6 +49,27 @@ func TestNewOAuthStateReturnsDistinctOpaqueValues(t *testing.T) {
 	}
 	if first == second {
 		t.Fatal("expected distinct OAuth states")
+	}
+}
+
+func TestGetHTTPClientRefusesRedirects(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "https://example.com/login", nil)
+	client := getHttpClient(req)
+
+	if client.Transport == nil {
+		t.Fatal("expected App Engine URL fetch transport")
+	}
+	if err := client.CheckRedirect(nil, nil); !errors.Is(err, http.ErrUseLastResponse) {
+		t.Fatalf("redirect policy error = %v, want http.ErrUseLastResponse", err)
+	}
+}
+
+func TestGetHTTPClientBoundsOAuthUserRequests(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "https://example.com/login", nil)
+	client := getHttpClient(req)
+
+	if client.Timeout != 10*time.Second {
+		t.Fatalf("timeout = %s, want 10s", client.Timeout)
 	}
 }
 
@@ -118,7 +141,7 @@ func TestDecodeOAuthUserResponseAcceptsExpectedFinalURL(t *testing.T) {
 }
 
 func TestDecodeOAuthUserResponseRejectsNonJSONBeforeRead(t *testing.T) {
-	for _, contentType := range []string{"", "text/html", "application/jsonp", "not a media type"} {
+	for _, contentType := range []string{"", "text/html", "application/jsonp", "application/json, text/html", "not a media type"} {
 		body := &trackingReadCloser{reader: strings.NewReader(validOAuthUserResponse())}
 		response := oauthUserResponse(http.StatusOK, contentType, body)
 
@@ -129,6 +152,32 @@ func TestDecodeOAuthUserResponseRejectsNonJSONBeforeRead(t *testing.T) {
 		if body.readCalls != 0 {
 			t.Fatalf("content type %q body reads = %d, want zero", contentType, body.readCalls)
 		}
+	}
+}
+
+func TestDecodeOAuthUserResponseRejectsDuplicateContentTypeBeforeRead(t *testing.T) {
+	body := &trackingReadCloser{reader: strings.NewReader(validOAuthUserResponse())}
+	response := oauthUserResponse(http.StatusOK, "application/json", body)
+	response.Header.Add("Content-Type", "text/html")
+
+	_, err := decodeOAuthUserResponse(response)
+	if !errors.Is(err, errOAuthUserResponseMediaType) {
+		t.Fatalf("error = %v, want %v", err, errOAuthUserResponseMediaType)
+	}
+	if body.readCalls != 0 {
+		t.Fatalf("body reads = %d, want zero", body.readCalls)
+	}
+}
+
+func TestDecodeOAuthUserResponseAcceptsSingleStructuredJSONContentType(t *testing.T) {
+	response := oauthUserResponse(
+		http.StatusOK,
+		"application/problem+json; charset=utf-8",
+		io.NopCloser(strings.NewReader(validOAuthUserResponse())),
+	)
+
+	if _, err := decodeOAuthUserResponse(response); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -171,6 +220,43 @@ func TestDecodeOAuthUserResponsePreservesReadError(t *testing.T) {
 	}
 }
 
+func TestDecodeOAuthUserResponseRejectsInvalidUTF8(t *testing.T) {
+	invalidID := append([]byte(`{"response":{"user":{"id":"`), 0xff)
+	invalidID = append(invalidID, []byte(`"}}}`)...)
+	invalidMember := append([]byte(`{"response":{"user":{"id":"user-1"},"`), 0xff)
+	invalidMember = append(invalidMember, []byte(`":true}}`)...)
+
+	for name, body := range map[string][]byte{
+		"identity value": invalidID,
+		"member name":    invalidMember,
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, err := decodeOAuthUserResponse(oauthUserResponse(
+				http.StatusOK,
+				"application/json",
+				io.NopCloser(bytes.NewReader(body)),
+			))
+			if !errors.Is(err, errOAuthUserResponseInvalidUTF8) {
+				t.Fatalf("error = %v, want %v", err, errOAuthUserResponseInvalidUTF8)
+			}
+		})
+	}
+}
+
+func TestDecodeOAuthUserResponseAcceptsValidUnicodeIdentity(t *testing.T) {
+	user, err := decodeOAuthUserResponse(oauthUserResponse(
+		http.StatusOK,
+		"application/json",
+		io.NopCloser(strings.NewReader(`{"response":{"user":{"id":"用户-1"}}}`)),
+	))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if user.User.ID != "用户-1" {
+		t.Fatalf("user ID = %q, want %q", user.User.ID, "用户-1")
+	}
+}
+
 func TestDecodeOAuthUserResponseRejectsMalformedPayloads(t *testing.T) {
 	for name, body := range map[string]string{
 		"wrapper": `{"response":`,
@@ -186,6 +272,89 @@ func TestDecodeOAuthUserResponseRejectsMalformedPayloads(t *testing.T) {
 				t.Fatal("error = nil, want malformed JSON rejection")
 			}
 		})
+	}
+}
+
+func TestDecodeOAuthUserResponseRejectsDuplicateJSONMembers(t *testing.T) {
+	for name, body := range map[string]string{
+		"response":             `{"response":{"user":{"id":"user-1"}},"response":{"user":{"id":"user-2"}}}`,
+		"user":                 `{"response":{"user":{"id":"user-1"},"user":{"id":"user-2"}}}`,
+		"id":                   `{"response":{"user":{"id":"user-1","id":"user-2"}}}`,
+		"array object":         `{"response":{"user":{"id":"user-1"},"items":[{"value":1,"value":2}]}}`,
+		"case-folded response": `{"response":{"user":{"id":"user-1"}},"Response":{"user":{"id":"user-2"}}}`,
+		"case-folded user":     `{"response":{"user":{"id":"user-1"},"User":{"id":"user-2"}}}`,
+		"case-folded id":       `{"response":{"user":{"id":"user-1","ID":"user-2"}}}`,
+		"Unicode fold":         `{"response":{"user":{"id":"user-1"},"items":[{"K":1,"\u212a":2}]}}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, err := decodeOAuthUserResponse(oauthUserResponse(
+				http.StatusOK,
+				"application/json",
+				io.NopCloser(strings.NewReader(body)),
+			))
+			if !errors.Is(err, errOAuthUserResponseDuplicateKey) {
+				t.Fatalf("error = %v, want %v", err, errOAuthUserResponseDuplicateKey)
+			}
+		})
+	}
+}
+
+func TestDecodeOAuthUserResponseAcceptsUniqueUnknownNestedMembers(t *testing.T) {
+	user, err := decodeOAuthUserResponse(oauthUserResponse(
+		http.StatusOK,
+		"application/json",
+		io.NopCloser(strings.NewReader(
+			`{"response":{"user":{"id":"user-1"},"items":[{"value":1},{"value":2}]}}`,
+		)),
+	))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if user.User.ID != "user-1" {
+		t.Fatalf("user ID = %q, want user-1", user.User.ID)
+	}
+}
+
+func TestDecodeOAuthUserResponseRejectsInvalidUserIDs(t *testing.T) {
+	for name, idField := range map[string]string{
+		"missing":             ``,
+		"empty":               `"id":""`,
+		"whitespace only":     `"id":" \t\n"`,
+		"leading whitespace":  `"id":"\u00a0user-1"`,
+		"trailing whitespace": `"id":"user-1 "`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			separator := ""
+			if idField != "" {
+				separator = ","
+			}
+			body := fmt.Sprintf(
+				`{"response":{"user":{%s%s"firstName":"Example"}}}`,
+				idField,
+				separator,
+			)
+			if _, err := decodeOAuthUserResponse(oauthUserResponse(
+				http.StatusOK,
+				"application/json",
+				io.NopCloser(strings.NewReader(body)),
+			)); !errors.Is(err, errOAuthUserResponseIdentity) {
+				t.Fatalf("error = %v, want %v", err, errOAuthUserResponseIdentity)
+			}
+		})
+	}
+}
+
+func TestDecodeOAuthUserResponseAllowsEmptyDisplayName(t *testing.T) {
+	user, err := decodeOAuthUserResponse(oauthUserResponse(
+		http.StatusOK,
+		"application/json",
+		io.NopCloser(strings.NewReader(`{"response":{"user":{"id":"user-1"}}}`)),
+	))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if user.User.ID != "user-1" || user.User.FirstName != "" {
+		t.Fatalf("user = %#v, want canonical ID and empty display name", user.User)
 	}
 }
 

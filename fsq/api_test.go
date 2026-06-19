@@ -1,6 +1,7 @@
 package fsq
 
 import (
+	"bytes"
 	"errors"
 	"io"
 	"net/http"
@@ -105,6 +106,15 @@ func TestFoursquareJSONResponseMediaTypes(t *testing.T) {
 		if isFoursquareJSONResponse(response) {
 			t.Errorf("isFoursquareJSONResponse(%q) = true, want false", contentType)
 		}
+	}
+}
+
+func TestFoursquareJSONResponseRejectsMultipleContentTypes(t *testing.T) {
+	response := testResponse(`{"response":{}}`)
+	response.Header.Add("Content-Type", "text/html")
+
+	if isFoursquareJSONResponse(response) {
+		t.Fatal("isFoursquareJSONResponse with multiple Content-Type fields = true, want false")
 	}
 }
 
@@ -228,6 +238,31 @@ func TestNewFoursquareServicePreservesExplicitClientTimeout(t *testing.T) {
 
 	if service.Config.Client.Timeout != explicitTimeout {
 		t.Fatalf("client timeout = %s, want %s", service.Config.Client.Timeout, explicitTimeout)
+	}
+}
+
+func TestNewFoursquareServiceRefusesRedirects(t *testing.T) {
+	transport := roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		return testResponse(`{"response":{}}`), nil
+	})
+	originalRedirect := func(req *http.Request, via []*http.Request) error { return nil }
+	config := &FoursquareConfig{
+		Client: http.Client{
+			Transport:     transport,
+			Timeout:       3 * time.Second,
+			CheckRedirect: originalRedirect,
+		},
+	}
+
+	service := NewFoursquareService(config)
+	if err := service.Config.Client.CheckRedirect(nil, nil); !errors.Is(err, http.ErrUseLastResponse) {
+		t.Fatalf("service redirect policy error = %v, want http.ErrUseLastResponse", err)
+	}
+	if service.Config.Client.Transport == nil || service.Config.Client.Timeout != 3*time.Second {
+		t.Fatal("service redirect policy must preserve caller transport and timeout")
+	}
+	if err := config.Client.CheckRedirect(nil, nil); err != nil {
+		t.Fatalf("caller redirect policy was mutated: %v", err)
 	}
 }
 
@@ -420,5 +455,55 @@ func TestDecodeFoursquareResponseRejectsEmptyBody(t *testing.T) {
 func TestDecodeFoursquareResponseRejectsMalformedJSON(t *testing.T) {
 	if err := decodeFoursquareResponse(strings.NewReader(`{"response":`), &VenueSearchResponse{}); err == nil {
 		t.Fatal("decodeFoursquareResponse malformed JSON error = nil, want JSON decode error")
+	}
+}
+
+func TestDecodeFoursquareResponseRejectsInvalidUTF8(t *testing.T) {
+	tests := []struct {
+		name string
+		body []byte
+	}{
+		{
+			name: "venue value",
+			body: []byte("{\"response\":{\"venues\":[{\"name\":\"\xff\"}]}}"),
+		},
+		{
+			name: "member name",
+			body: []byte("{\"response\":{\"venues\":[{\"na\xffme\":\"Cafe\"}]}}"),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			err := decodeFoursquareResponse(bytes.NewReader(test.body), &VenueSearchResponse{})
+			if !errors.Is(err, errFoursquareResponseInvalidUTF8) {
+				t.Fatalf("decodeFoursquareResponse error = %v, want %v", err, errFoursquareResponseInvalidUTF8)
+			}
+		})
+	}
+}
+
+func TestDecodeFoursquareResponseAcceptsValidUnicode(t *testing.T) {
+	body := `{"response":{"venues":[{"name":"Café 東京"}]}}`
+	target := new(VenueSearchResponse)
+
+	if err := decodeFoursquareResponse(strings.NewReader(body), target); err != nil {
+		t.Fatalf("decodeFoursquareResponse valid Unicode: %v", err)
+	}
+	if len(target.Venues) != 1 {
+		t.Fatalf("venue count = %d, want 1", len(target.Venues))
+	}
+	if got := target.Venues[0].Name; got != "Café 東京" {
+		t.Fatalf("venue name = %q, want valid Unicode preserved", got)
+	}
+}
+
+func TestDecodeFoursquareResponsePrefersTooLargeOverInvalidUTF8(t *testing.T) {
+	body := bytes.Repeat([]byte{' '}, maxFoursquareResponseBytes+1)
+	body[len(body)-1] = 0xff
+
+	err := decodeFoursquareResponse(bytes.NewReader(body), &VenueSearchResponse{})
+	if !errors.Is(err, errFoursquareResponseTooLarge) {
+		t.Fatalf("decodeFoursquareResponse error = %v, want %v", err, errFoursquareResponseTooLarge)
 	}
 }
