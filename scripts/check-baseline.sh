@@ -132,9 +132,9 @@ python3 "$OAUTH_USER_TIMEOUT_CHECK" \
   "$ROOT_DIR/auth_test.go" \
   "$OAUTH_USER_TIMEOUT_PLAN"
 
-if ! grep -Fq 'ROOT := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))' "$ROOT_DIR/Makefile" ||
+if ! grep -Fq 'override ROOT := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))' "$ROOT_DIR/Makefile" ||
   ! grep -Fq '"$(ROOT)/scripts/check-baseline.sh"' "$ROOT_DIR/Makefile"; then
-  printf '%s\n' "Makefile verification must resolve the checker from the loaded Makefile." >&2
+  printf '%s\n' "Makefile verification must protect the loaded Makefile root from overrides." >&2
   exit 1
 fi
 
