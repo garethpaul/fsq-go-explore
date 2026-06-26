@@ -91,6 +91,25 @@ func TestRedirectRejectsMissingAuthorizationCodeBeforeExchange(t *testing.T) {
 	}
 }
 
+func TestRedirectRejectsNonGETBeforeReadingFormBody(t *testing.T) {
+	body := &trackingReadCloser{reader: strings.NewReader("state=state-1&code=code-1")}
+	req := httptest.NewRequest(http.MethodPost, "/redirect", body)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rr := httptest.NewRecorder()
+
+	Redirect(rr, req)
+
+	if rr.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("status = %d, want %d", rr.Code, http.StatusMethodNotAllowed)
+	}
+	if allow := rr.Header().Get("Allow"); allow != http.MethodGet {
+		t.Fatalf("Allow = %q, want %q", allow, http.MethodGet)
+	}
+	if body.readCalls != 0 {
+		t.Fatalf("body reads = %d, want zero", body.readCalls)
+	}
+}
+
 func TestDecodeOAuthUserResponseRejectsNonSuccessBeforeRead(t *testing.T) {
 	for _, status := range []int{http.StatusContinue, http.StatusMovedPermanently, http.StatusBadRequest, http.StatusBadGateway} {
 		body := &trackingReadCloser{reader: strings.NewReader(validOAuthUserResponse())}

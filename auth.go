@@ -150,6 +150,12 @@ func Login(w http.ResponseWriter, r *http.Request) {
 }
 
 func Redirect(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		w.Header().Set("Allow", http.MethodGet)
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
 	log.Print("received Foursquare callback")
 	state := r.FormValue("state")
 	stateCookie, err := r.Cookie(oauthStateCookieName)

@@ -39,6 +39,7 @@ Current baseline:
   string.
 - OAuth callbacks reject missing OAuth authorization codes before token exchange
   work starts.
+- OAuth callbacks reject non-GET methods before form parsing or provider work.
 - OAuth user-profile responses require 2xx status, the exact final HTTPS
   Foursquare user endpoint, and exactly one JSON media-type field before reads,
   followed by a 1 MiB body boundary before wrapper or user decoding.

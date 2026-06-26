@@ -46,6 +46,7 @@
 - Keep API keys, OAuth credentials, access tokens, `.env` files, and deployment-specific config out of source control.
 - Cache keys are deterministic SHA-256 digests and should not expose raw query, token, or user fields.
 - OAuth login uses per-request state values and HTTP-only cookies for callback validation.
+- OAuth callbacks accept only GET and reject other methods before reading form bodies.
 - OAuth callbacks with matching state still fail before token exchange; missing OAuth authorization codes are rejected.
 - Reject non-2xx OAuth user-profile responses, unexpected final endpoints, and
   non-JSON media types before reads; cap accepted profile bodies at 1 MiB before

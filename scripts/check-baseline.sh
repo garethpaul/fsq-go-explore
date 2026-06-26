@@ -8,6 +8,7 @@ VENUE_ID_PLAN="$ROOT_DIR/docs/plans/2026-06-09-fsq-venue-id-boundary.md"
 SEARCH_PARAM_PLAN="$ROOT_DIR/docs/plans/2026-06-09-fsq-search-param-length.md"
 EDIT_ID_FIRST_PLAN="$ROOT_DIR/docs/plans/2026-06-09-fsq-edit-page-id-first.md"
 OAUTH_CODE_PLAN="$ROOT_DIR/docs/plans/2026-06-09-fsq-oauth-code-boundary.md"
+OAUTH_CALLBACK_METHOD_PLAN="$ROOT_DIR/docs/plans/2026-06-26-oauth-callback-get-only.md"
 MAKE_GATES_PLAN="$ROOT_DIR/docs/plans/2026-06-09-fsq-go-make-gate-aliases.md"
 USER_CACHE_KEY_PLAN="$ROOT_DIR/docs/plans/2026-06-09-fsq-user-cache-key-boundary.md"
 ETAG_MATCH_PLAN="$ROOT_DIR/docs/plans/2026-06-09-fsq-etag-exact-match.md"
@@ -288,6 +289,26 @@ if ! grep -Fq 'strings.TrimSpace(r.FormValue("code"))' "$ROOT_DIR/auth.go" ||
   exit 1
 fi
 
+python3 - "$ROOT_DIR/auth.go" "$ROOT_DIR/auth_test.go" <<'PY'
+import sys
+from pathlib import Path
+
+source = Path(sys.argv[1]).read_text()
+tests = Path(sys.argv[2]).read_text()
+redirect = source.split("func Redirect(w http.ResponseWriter, r *http.Request) {", 1)[-1].split("\n}", 1)[0]
+method_guard = 'if r.Method != http.MethodGet {'
+form_read = 'r.FormValue("state")'
+required = (
+    method_guard,
+    'w.Header().Set("Allow", http.MethodGet)',
+    'http.StatusMethodNotAllowed',
+)
+if any(item not in redirect for item in required) or redirect.index(method_guard) > redirect.index(form_read):
+    raise SystemExit("OAuth callbacks must reject non-GET methods before form-body parsing.")
+if "TestRedirectRejectsNonGETBeforeReadingFormBody" not in tests or "body.readCalls != 0" not in tests:
+    raise SystemExit("OAuth callback method tests must prove rejection before request-body reads.")
+PY
+
 python3 - "$ROOT_DIR/fsq/api.go" "$ROOT_DIR/fsq/api_test.go" "$ROOT_DIR/auth.go" "$ROOT_DIR/auth_test.go" <<'PY'
 import sys
 from pathlib import Path
@@ -386,7 +407,7 @@ required_tests = (
 )
 if any(tests.count(item) != 1 for item in required_tests):
     raise SystemExit("Focused OAuth user response boundary tests must remain unique.")
-if tests.count("body.readCalls != 0") != 4:
+if tests.count("body.readCalls != 0") != 5:
     raise SystemExit("OAuth response rejection tests must prove bodies remain unread.")
 PY
 
@@ -768,6 +789,11 @@ fi
 
 if ! grep -Fq "status: completed" "$OAUTH_CODE_PLAN"; then
   printf '%s\n' "OAuth code boundary plan must be marked completed." >&2
+  exit 1
+fi
+
+if ! grep -Fq "status: completed" "$OAUTH_CALLBACK_METHOD_PLAN"; then
+  printf '%s\n' "OAuth callback method plan must be marked completed." >&2
   exit 1
 fi
 
