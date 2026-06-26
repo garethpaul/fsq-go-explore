@@ -82,7 +82,8 @@ missing venue IDs are rejected before auth, template parsing, or venue API
 requests. Malformed edit forms are rejected before auth-cookie lookup or
 Foursquare edit work. Search query and location values are trimmed and
 length-bounded before venue search requests are built. OAuth callbacks reject
-missing authorization codes before exchange work starts. Auth cookies must carry
+non-GET methods before form parsing and reject missing authorization codes
+before exchange work starts. Auth cookies must carry
 generated user cache keys before access-token memcache lookup starts. ETag
 comparisons are exact, so partial `If-None-Match` values cannot trigger cached
 `304` responses.
@@ -148,6 +149,8 @@ When the required SDK or runtime is unavailable, use static checks and source re
   token, or user fields.
 - OAuth login uses per-request state values and HTTP-only cookies for callback
   validation.
+- OAuth callbacks accept only GET and reject other methods before reading form
+  bodies.
 - OAuth callbacks with matching state still fail before token exchange; missing OAuth authorization codes are rejected.
 - OAuth user-profile responses reject non-2xx statuses, unexpected final
   endpoints, and missing, duplicate, combined, or non-JSON media types before

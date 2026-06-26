@@ -1,5 +1,45 @@
 # Changes
 
+## 2026-06-26 11:51 PDT - P1 - Reject non-GET OAuth callbacks
+
+### Summary
+Restricted the Foursquare OAuth redirect handler to the provider-documented
+GET callback before any form-body parsing, logging, state checks, or token work.
+
+### Work completed
+- Added an early `405 Method Not Allowed` response with `Allow: GET`.
+- Added a regression proving POST bodies are not read.
+- Added a maintained source-order contract and synchronized security guidance.
+
+### Threads
+- Delegated: none.
+
+### Files changed
+- `auth.go` — added the callback method boundary.
+- `auth_test.go` — added the no-body-read regression.
+- `scripts/check-baseline.sh` — enforced guard ordering and focused coverage.
+- `README.md`, `SECURITY.md`, `VISION.md`, `AGENTS.md` — documented the boundary.
+- `docs/plans/2026-06-26-oauth-callback-get-only.md` — recorded evidence,
+  alternatives, and verification.
+
+### Validation
+- Focused test failed with HTTP 307 before implementation and passed after.
+- Official Go 1.25.11 archive SHA-256 — verified before local use.
+- `go test -race -count=1 ./...`, `go vet ./...`, and `go mod tidy -diff` — passed.
+- All Make aliases, external-directory Make, and `git diff --check` — passed.
+- Isolated guard-removal mutation — rejected with the intended 307/405 failure.
+
+### Bugs / findings
+- P1: POST callbacks reached `FormValue`, allowing request-body parsing on a
+  provider callback that is documented as a query-string GET redirect.
+
+### Blockers
+- No live Foursquare credentials or OAuth exchange were used.
+
+### Next action
+- Require the exact PR head to pass hosted Go verification and CodeQL, attempt
+  Codex review once, then merge only that green SHA.
+
 ## 2026-06-18
 
 - Raised the maintained Go toolchain to 1.25.11 to incorporate standard-library
