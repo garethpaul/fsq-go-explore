@@ -43,3 +43,27 @@ configuration contract misleading.
 - `git diff --check`
 - Mutations restoring one-token-per-TTL refill or allowing invalid
   configurations must fail.
+
+## Follow-up: guarantees now come from upstream go-ratelimiter
+
+`limiter/` was a vendored copy of `github.com/garethpaul/go-ratelimiter` with no
+test coverage, and it had drifted **in both directions**: upstream carried key
+encoding, atomic multi-key consumption, rejection-status clamping and
+`netip`-based IP canonicalization fixes the copy lacked, while the copy carried
+this plan's refill work under names upstream does not use.
+
+The application now depends on upstream. Upstream satisfies this plan's
+guarantees — verified behaviorally rather than by matching source strings:
+
+- Refill: `NewLimiter(2, 200ms)` allows 2, then allows 2 again after the TTL.
+- Invalid configuration: `max=0`, `max=-1`, and `ttl=0` each allow **0 of 5**
+  requests, so invalid configuration fails closed rather than becoming
+  unlimited.
+
+The previous `check-baseline.sh` greps asserted the vendored implementation's
+internals (`float64(max) / ttl.Seconds()`, `max <= 0 || ttl <= 0`,
+`func newTokenBucket`). Upstream implements the same behavior differently, so
+those greps rejected a functionally equivalent limiter — the contract blocked
+its own fix. They are replaced by `limiter_contract_test.go`, which asserts the
+behavior through the public API, plus a pinned-dependency check and a guard
+against re-vendoring `limiter/`.
