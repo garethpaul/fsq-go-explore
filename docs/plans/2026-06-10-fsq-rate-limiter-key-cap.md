@@ -35,3 +35,17 @@ without weakening per-key request limits.
 - `git diff --check`
 - Mutations disabling the cap or recency refresh must fail.
 - Hosted Go module integrity workflow.
+
+## Follow-up: cap is now upstream's, asserted behaviorally
+
+`limiter/` was an untested vendored copy of
+`github.com/garethpaul/go-ratelimiter`. The application now depends on upstream,
+which carries this cap (`defaultMaxTrackedKeys`, `list.New()`, `MoveToFront`,
+`tokenBucketOrder`, LRU eviction) along with key-encoding, atomicity, IP
+canonicalization and status-clamping fixes the copy had drifted away from.
+
+The cap is asserted through the public API in `limiter_contract_test.go`
+(`TestRateLimiterBoundsTrackedKeys`) rather than by grepping vendored source, so
+an equivalent implementation is no longer rejected. `check-baseline.sh` also pins
+the dependency and fails if `limiter/` is re-vendored, since the copy's zero
+coverage is why the drift went unnoticed.

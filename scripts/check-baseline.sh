@@ -75,8 +75,7 @@ for path in \
   "fsq/api_test.go" \
   "fsq/keys.go" \
   "fsq/keys_test.go" \
-  "limiter/limiter.go" \
-  "limiter/config/config_test.go" \
+  "limiter_contract_test.go" \
   "scripts/check-response-content-type.py" \
   "scripts/check-response-final-url.py" \
   "scripts/check-oauth-user-timeout.py" \
@@ -639,23 +638,27 @@ if ! grep -Fq "const maxVenueEditBodyBytes int64 = 64 << 10" "$ROOT_DIR/edit.go"
   exit 1
 fi
 
-if ! grep -Fq "defaultMaxTrackedKeys = 10000" "$ROOT_DIR/limiter/config/config.go" ||
-  ! grep -Fq "list.New()" "$ROOT_DIR/limiter/config/config.go" ||
-  ! grep -Fq "MoveToFront" "$ROOT_DIR/limiter/config/config.go" ||
-  ! grep -Fq "tokenBucketOrder.Back()" "$ROOT_DIR/limiter/config/config.go" ||
-  ! grep -Fq "delete(l.tokenBuckets, oldestKey)" "$ROOT_DIR/limiter/config/config.go" ||
-  ! grep -Fq "TestLimiterCapsTrackedKeys" "$ROOT_DIR/limiter/config/config_test.go" ||
-  ! grep -Fq "TestLimiterEvictsLeastRecentlyUsedKey" "$ROOT_DIR/limiter/config/config_test.go"; then
-  printf '%s\n' "Rate limiter keys must remain capped with recency-sensitive eviction tests." >&2
+# The rate limiter is the upstream github.com/garethpaul/go-ratelimiter module
+# rather than a vendored copy. Pin the dependency so it cannot silently vanish,
+# and assert the guarantees behaviorally below rather than by grepping an
+# implementation: the previous greps matched one implementation's internals
+# (defaultMaxTrackedKeys = 10000, float64(max) / ttl.Seconds(), ...) and so
+# rejected any functionally equivalent limiter, including upstream's.
+if ! grep -Fq "github.com/garethpaul/go-ratelimiter" "$ROOT_DIR/go.mod"; then
+  printf '%s\n' "Rate limiting must depend on github.com/garethpaul/go-ratelimiter." >&2
   exit 1
 fi
 
-if ! grep -Fq "func newTokenBucket" "$ROOT_DIR/limiter/config/config.go" ||
-  ! grep -Fq "float64(max) / ttl.Seconds()" "$ROOT_DIR/limiter/config/config.go" ||
-  ! grep -Fq "max <= 0 || ttl <= 0" "$ROOT_DIR/limiter/config/config.go" ||
-  ! grep -Fq "TestLimiterRefillsConfiguredMaximumAcrossTTL" "$ROOT_DIR/limiter/config/config_test.go" ||
-  ! grep -Fq "TestLimiterRejectsInvalidRateConfiguration" "$ROOT_DIR/limiter/config/config_test.go"; then
-  printf '%s\n' "Rate limiter buckets must refill Max requests over TTL and reject invalid configurations." >&2
+if git -C "$ROOT_DIR" ls-files --error-unmatch limiter/limiter.go >/dev/null 2>&1; then
+  printf '%s\n' "limiter/ must not be re-vendored; depend on go-ratelimiter so upstream fixes are not forked away." >&2
+  exit 1
+fi
+
+if ! grep -Fq "func TestRateLimiterRefillsMaximumAcrossTTL" "$ROOT_DIR/limiter_contract_test.go" ||
+  ! grep -Fq "func TestRateLimiterFailsClosedOnInvalidConfiguration" "$ROOT_DIR/limiter_contract_test.go" ||
+  ! grep -Fq "func TestRateLimiterBoundsTrackedKeys" "$ROOT_DIR/limiter_contract_test.go" ||
+  ! grep -Fq "func TestRateLimitHandlerSeparatesClientsAndClampsStatus" "$ROOT_DIR/limiter_contract_test.go"; then
+  printf '%s\n' "Rate limiter behavior contracts must cover refill over TTL, fail-closed invalid configuration, bounded key tracking, and per-client budgets with a clamped rejection status." >&2
   exit 1
 fi
 

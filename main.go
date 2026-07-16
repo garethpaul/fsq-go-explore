@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/garethpaul/fsq-go-explore/limiter"
+	limiter "github.com/garethpaul/go-ratelimiter"
 )
 
 func init() {
