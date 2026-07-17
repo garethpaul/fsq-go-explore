@@ -26,5 +26,7 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
+      - name: Verify baseline gate wiring
+        run: ./scripts/check-baseline.sh
       - name: Run Go baseline
         run: make check

@@ -50,6 +50,10 @@ require_file() {
   fi
 }
 
+exact_line_count() {
+  awk -v expected="$2" '$0 == expected { count += 1 } END { print count + 0 }' "$1"
+}
+
 for path in \
   ".gitignore" \
   ".github/workflows/check.yml" \
@@ -112,7 +116,8 @@ for path in \
   "docs/plans/2026-06-09-fsq-oauth-code-boundary.md" \
   "docs/plans/2026-06-09-fsq-venue-id-boundary.md" \
   "docs/plans/2026-06-09-fsq-propose-edit-post-only.md" \
-  "docs/plans/2026-06-08-fsq-go-explore-go-baseline.md"; do
+  "docs/plans/2026-06-08-fsq-go-explore-go-baseline.md" \
+  "docs/plans/2026-07-17-make-gate-propagation.md"; do
   require_file "$path"
 done
 
@@ -153,6 +158,61 @@ if ! grep -Eq '^\.PHONY: .*build.*check.*lint.*test|^\.PHONY: .*build.*lint.*tes
   printf '%s\n' "Makefile must expose lint, test, build, and check gate targets." >&2
   exit 1
 fi
+
+# The substring greps above still match a neutered recipe, because
+# `@"$(ROOT)/scripts/check-baseline.sh"` is a prefix of
+# `@"$(ROOT)/scripts/check-baseline.sh" || true`. Pin the whole recipe line.
+makefile_recipe=$(printf '\t@"$(ROOT)/scripts/check-baseline.sh"')
+if [ "$(exact_line_count "$makefile" "$makefile_recipe")" -ne 1 ]; then
+  printf '%s\n' "Makefile must invoke the baseline gate on exactly one unmodified recipe line." >&2
+  exit 1
+fi
+
+# A whole-line pin still cannot see make-level neuters that leave the recipe
+# byte-identical (`.IGNORE:`, `MAKEFLAGS += -i`, a later duplicate `check:`
+# rule). Inject a failing gate into a throwaway copy of the real Makefile and
+# require every gate target to observe it run and propagate its exit status.
+verify_makefile_gate_propagation() {
+  probe_dir=$(mktemp -d) || exit 1
+  mkdir -p "$probe_dir/scripts"
+  cp "$makefile" "$probe_dir/Makefile"
+  marker="$probe_dir/gate-ran"
+
+  printf '%s\n' '#!/bin/sh' 'printf ran > "$(dirname "$0")/../gate-ran"' 'exit 0' \
+    >"$probe_dir/scripts/check-baseline.sh"
+  chmod +x "$probe_dir/scripts/check-baseline.sh"
+  for target in check lint test build; do
+    rm -f "$marker"
+    if ! (cd "$probe_dir" && make "$target" >/dev/null 2>&1); then
+      rm -rf "$probe_dir"
+      printf '%s\n' "Makefile target $target must succeed when the baseline gate passes." >&2
+      exit 1
+    fi
+    if [ ! -f "$marker" ]; then
+      rm -rf "$probe_dir"
+      printf '%s\n' "Makefile target $target must execute scripts/check-baseline.sh." >&2
+      exit 1
+    fi
+  done
+
+  printf '%s\n' '#!/bin/sh' 'exit 1' >"$probe_dir/scripts/check-baseline.sh"
+  chmod +x "$probe_dir/scripts/check-baseline.sh"
+  for target in check lint test build; do
+    if (cd "$probe_dir" && make "$target" >/dev/null 2>&1); then
+      rm -rf "$probe_dir"
+      printf '%s\n' "Makefile target $target must fail when scripts/check-baseline.sh fails." >&2
+      exit 1
+    fi
+  done
+
+  rm -rf "$probe_dir"
+}
+
+if ! command -v make >/dev/null 2>&1; then
+  printf '%s\n' "make is required to verify Makefile gate propagation." >&2
+  exit 1
+fi
+verify_makefile_gate_propagation
 
 python3 - "$ROOT_DIR/fsq/api.go" "$ROOT_DIR/fsq/api_test.go" <<'PY'
 import sys
@@ -723,10 +783,6 @@ if ! grep -Fq '`google.golang.org/protobuf` v1.36.11' "$ROOT_DIR/README.md" || \
   exit 1
 fi
 
-exact_line_count() {
-  awk -v expected="$2" '$0 == expected { count += 1 } END { print count + 0 }' "$1"
-}
-
 if [ "$(exact_line_count "$WORKFLOW" 'permissions:')" -ne 1 ] || \
   [ "$(exact_line_count "$WORKFLOW" '  contents: read')" -ne 1 ] || \
   grep -Eq '^[[:space:]]+permissions:' "$WORKFLOW" || \
@@ -748,6 +804,15 @@ if [ "$(grep -Fc 'uses: actions/setup-go@' "$WORKFLOW")" -ne 1 ] || \
   [ "$(exact_line_count "$WORKFLOW" '          go-version-file: go.mod')" -ne 1 ] || \
   [ "$(exact_line_count "$WORKFLOW" '        run: make check')" -ne 1 ]; then
   printf '%s\n' "GitHub Actions must keep the pinned Go setup and canonical make check gate." >&2
+  exit 1
+fi
+
+# `make check` cannot police the Makefile that defines it: any recipe neuter
+# (`|| true`, `.IGNORE:`, a dash prefix) swallows this script's exit status, so
+# the checks above reach CI only through a path make cannot swallow. CI must
+# therefore also run this script directly.
+if [ "$(exact_line_count "$WORKFLOW" '        run: ./scripts/check-baseline.sh')" -ne 1 ]; then
+  printf '%s\n' "GitHub Actions must run scripts/check-baseline.sh directly so Makefile neuters cannot swallow the gate verdict." >&2
   exit 1
 fi
 

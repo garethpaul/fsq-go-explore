@@ -1,5 +1,20 @@
 # Changes
 
+## 2026-07-17 - P1 - Observe the Make gate executing and propagating failure
+
+### Summary
+Closed a verification gap where appending `|| true` to the Makefile recipe made
+`make check` exit 0 for every violation while leaving every pinned string
+byte-identical, because the gate asserted its invocation only as a substring.
+
+### Work completed
+- Pinned the gate invocation as an anchored whole recipe line via the existing
+  `exact_line_count` helper.
+- Added failure-injection propagation: a throwaway copy of the real Makefile must
+  execute the gate and turn every gate target red when the gate fails.
+- Added and pinned a `Verify baseline gate wiring` CI step that runs the checker
+  directly, so a neutered Makefile cannot swallow the verdict.
+
 ## 2026-06-26 11:51 PDT - P1 - Reject non-GET OAuth callbacks
 
 ### Summary
